@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/louismollick/yomitan-core/compare/v1.0.1...v1.0.2) (2026-02-16)
+
+
+### Bug Fixes
+
+* use dictionary css styles ([152cbac](https://github.com/louismollick/yomitan-core/commit/152cbac456497903598029bfe3e069a907122b2d))
+
 ## [1.0.1](https://github.com/louismollick/yomitan-core/compare/v1.0.0...v1.0.1) (2026-02-16)
 
 
