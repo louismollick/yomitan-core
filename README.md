@@ -1,6 +1,6 @@
 # yomitan-core
 
-Core dictionary lookup, language processing, and rendering engine extracted from the [Yomitan](https://github.com/yomidevs/yomitan) browser extension. Use it in Node.js, Electron, or any JavaScript environment with IndexedDB.
+Core dictionary lookup, language processing, and rendering engine extracted from the [Yomitan](https://github.com/louismollick/yomitan) browser extension. Use it in Node.js, Electron, or any JavaScript environment with IndexedDB.
 
 ## Installation
 
@@ -337,7 +337,7 @@ console.log(node.outerHTML);
 ### Setup
 
 ```bash
-git clone https://github.com/yomidevs/yomitan-core.git
+git clone https://github.com/louismollick/yomitan-core.git
 cd yomitan-core
 npm install
 ```
@@ -354,6 +354,30 @@ npm install
 | `npm run format` | Format all files with Biome |
 | `npm run test` | Run tests with vitest |
 | `npm run test:watch` | Watch mode tests |
+
+### Automated versioning and releases
+
+This repo uses semantic-release on pushes to `main`/`master` to:
+
+- determine the next version from commit messages
+- update `package.json` and `package-lock.json`
+- update `CHANGELOG.md`
+- publish to npm
+- create a GitHub release and tag
+
+This workflow uses npm trusted publishing via OIDC (no `NPM_TOKEN` secret).
+Configure a trusted publisher for this GitHub repository in npm settings.
+
+Requirements:
+
+- GitHub Actions workflow permission `id-token: write`
+- Node.js `22.14.0+` in the release job (npm CLI `11.5.1+`)
+
+Use Conventional Commits so version bumps are calculated correctly:
+
+- `fix: ...` -> patch release (`x.y.Z`)
+- `feat: ...` -> minor release (`x.Y.0`)
+- `feat!: ...` or a commit body with `BREAKING CHANGE:` -> major release (`X.0.0`)
 
 ### Testing locally from another project
 

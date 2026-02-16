@@ -46,9 +46,25 @@ export interface SentenceParserOptions {
     maxLength?: number;
 }
 
+type MatchResult = {
+    length: number;
+    entries: TermDictionaryEntry[];
+    term: string;
+    reading: string;
+};
+
+type SegmentCandidate = {
+    to: number;
+    score: number;
+    match: MatchResult;
+};
+
 /**
- * Parses text into segments with dictionary lookups using a left-to-right
- * sliding window (longest match) algorithm.
+ * Parses text into segments with dictionary lookups.
+ *
+ * The parser enumerates candidate dictionary matches at every position and then
+ * chooses a global best path. This avoids greedy local choices such as
+ * splitting 会わせて into 会わせ + て and more closely matches extension behavior.
  */
 export class SentenceParser {
     private _translator: Translator;
@@ -59,9 +75,6 @@ export class SentenceParser {
 
     /**
      * Parses the given text into lines of parsed segments.
-     * For each position, attempts to find the longest dictionary match by
-     * querying the translator with progressively shorter substrings.
-     * Generates furigana for Japanese text segments.
      */
     async parseText(text: string, language: string, options: SentenceParserOptions): Promise<ParsedLine[]> {
         const maxLength = options.maxLength ?? 20;
@@ -79,7 +92,7 @@ export class SentenceParser {
     }
 
     /**
-     * Parses a single line of text into segments.
+     * Parses a single line into segments using global best-path optimization.
      */
     private async _parseLine(
         line: string,
@@ -87,65 +100,132 @@ export class SentenceParser {
         enabledDictionaryMap: Map<string, FindTermDictionary>,
         maxLength: number,
     ): Promise<ParsedSegment[]> {
+        const n = line.length;
+        if (n === 0) {
+            return [];
+        }
+
+        const findTermsOptions = this._createFindTermsOptions(language, enabledDictionaryMap);
+        const lookupCache = new Map<string, Promise<MatchResult | null>>();
+
+        const lookupMatch = async (substring: string): Promise<MatchResult | null> => {
+            const cached = lookupCache.get(substring);
+            if (cached) {
+                return await cached;
+            }
+
+            const promise = this._translator
+                .findTerms('simple', substring, findTermsOptions)
+                .then(({ dictionaryEntries, originalTextLength }) => {
+                    if (dictionaryEntries.length === 0 || originalTextLength <= 0) {
+                        return null;
+                    }
+
+                    const firstEntry = dictionaryEntries[0];
+                    const headword = firstEntry.headwords[0];
+                    const term = headword?.term ?? substring.substring(0, originalTextLength);
+                    const reading = headword?.reading ?? '';
+
+                    return {
+                        length: originalTextLength,
+                        entries: dictionaryEntries,
+                        term,
+                        reading,
+                    } satisfies MatchResult;
+                })
+                .catch(() => null);
+
+            lookupCache.set(substring, promise);
+            return await promise;
+        };
+
+        const candidatesAt: SegmentCandidate[][] = Array.from({ length: n }, () => []);
+
+        for (let start = 0; start < n; ++start) {
+            const remaining = n - start;
+            const searchLength = Math.min(remaining, maxLength);
+            const byEnd = new Map<number, SegmentCandidate>();
+
+            for (let len = searchLength; len > 0; --len) {
+                const substring = line.substring(start, start + len);
+                const match = await lookupMatch(substring);
+                if (match === null) {
+                    continue;
+                }
+
+                const end = start + match.length;
+                if (end <= start || end > n) {
+                    continue;
+                }
+
+                const surface = line.substring(start, end);
+                const isSurfaceMismatch = match.term.length > 0 && match.term !== surface;
+                // Penalize deinflected surface mismatches slightly to reduce over-greedy tails.
+                const mismatchPenalty = isSurfaceMismatch ? Math.ceil(match.length * 0.75) : 0;
+                const score = match.length * match.length - mismatchPenalty;
+
+                const candidate: SegmentCandidate = { to: end, score, match };
+                const existing = byEnd.get(end);
+                if (!existing || candidate.score > existing.score) {
+                    byEnd.set(end, candidate);
+                }
+            }
+
+            if (byEnd.size === 0) {
+                const char = line.substring(start, start + 1);
+                byEnd.set(start + 1, {
+                    to: start + 1,
+                    // Strongly discourage fallback when dictionary matches exist.
+                    score: -100,
+                    match: {
+                        length: 1,
+                        entries: [],
+                        term: char,
+                        reading: '',
+                    },
+                });
+            }
+
+            candidatesAt[start] = [...byEnd.values()];
+        }
+
+        const bestScore = Array<number>(n + 1).fill(Number.NEGATIVE_INFINITY);
+        const bestChoice = Array<SegmentCandidate | null>(n + 1).fill(null);
+        bestScore[n] = 0;
+
+        for (let i = n - 1; i >= 0; --i) {
+            for (const candidate of candidatesAt[i]) {
+                const continuation = bestScore[candidate.to];
+                if (!Number.isFinite(continuation)) {
+                    continue;
+                }
+
+                // Small per-token penalty to prefer fewer, longer segments.
+                const score = candidate.score + continuation - 1;
+                const previous = bestScore[i];
+                const previousChoice = bestChoice[i];
+
+                const isBetter =
+                    score > previous ||
+                    (score === previous &&
+                        previousChoice !== null &&
+                        candidate.match.length > previousChoice.match.length);
+
+                if (isBetter || previousChoice === null) {
+                    bestScore[i] = score;
+                    bestChoice[i] = candidate;
+                }
+            }
+        }
+
         const segments: ParsedSegment[] = [];
         let position = 0;
 
-        while (position < line.length) {
-            const remaining = line.substring(position);
-            const searchLength = Math.min(remaining.length, maxLength);
-
-            let bestMatch: {
-                length: number;
-                entries: TermDictionaryEntry[];
-                term: string;
-                reading: string;
-            } | null = null;
-
-            // Try progressively shorter substrings from longest to shortest
-            for (let len = searchLength; len > 0; --len) {
-                const substring = remaining.substring(0, len);
-
-                const findTermsOptions = this._createFindTermsOptions(language, enabledDictionaryMap);
-
-                try {
-                    const { dictionaryEntries, originalTextLength } = await this._translator.findTerms(
-                        'simple',
-                        substring,
-                        findTermsOptions,
-                    );
-
-                    if (dictionaryEntries.length > 0 && originalTextLength > 0) {
-                        const firstEntry = dictionaryEntries[0];
-                        const headword = firstEntry.headwords[0];
-                        bestMatch = {
-                            length: originalTextLength,
-                            entries: dictionaryEntries,
-                            term: headword.term,
-                            reading: headword.reading,
-                        };
-                        break;
-                    }
-                } catch {}
-            }
-
-            if (bestMatch !== null) {
-                const surfaceText = remaining.substring(0, bestMatch.length);
-                const furigana =
-                    language === 'ja'
-                        ? distributeFurigana(surfaceText, bestMatch.reading)
-                        : [{ text: surfaceText, reading: '' }];
-
-                segments.push({
-                    text: surfaceText,
-                    reading: bestMatch.reading,
-                    term: bestMatch.term,
-                    entries: bestMatch.entries,
-                    furigana,
-                });
-                position += bestMatch.length;
-            } else {
-                // No match found; consume one character
-                const char = remaining.substring(0, 1);
+        while (position < n) {
+            const choice = bestChoice[position];
+            if (!choice || choice.to <= position) {
+                // Safety fallback if DP path is unexpectedly incomplete.
+                const char = line.substring(position, position + 1);
                 segments.push({
                     text: char,
                     reading: '',
@@ -154,7 +234,24 @@ export class SentenceParser {
                     furigana: [{ text: char, reading: '' }],
                 });
                 position += char.length;
+                continue;
             }
+
+            const surfaceText = line.substring(position, choice.to);
+            const furigana =
+                language === 'ja'
+                    ? distributeFurigana(surfaceText, choice.match.reading)
+                    : [{ text: surfaceText, reading: '' }];
+
+            segments.push({
+                text: surfaceText,
+                reading: choice.match.reading,
+                term: choice.match.term,
+                entries: choice.match.entries,
+                furigana,
+            });
+
+            position = choice.to;
         }
 
         return segments;

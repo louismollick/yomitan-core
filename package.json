@@ -9,7 +9,7 @@
     "license": "GPL-3.0-or-later",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/yomidevs/yomitan-core.git"
+        "url": "git+https://github.com/louismollick/yomitan-core.git"
     },
     "exports": {
         ".": {
