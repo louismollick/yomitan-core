@@ -15,11 +15,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { PRONUNCIATION_CSS } from './pronunciation-styles.js';
+import { STRUCTURED_CONTENT_CSS } from './structured-content-styles.js';
+
 /**
- * The display CSS styles from the Yomitan extension.
+ * The base display CSS styles from the Yomitan extension.
  * Sourced from Yomitan's ext/css/display.css.
  */
-export const DISPLAY_CSS = `/*
+const DISPLAY_BASE_CSS = `/*
  * Copyright (C) 2023-2025  Yomitan Authors
  * Copyright (C) 2016-2022  Yomichan Authors
  *
@@ -2055,7 +2058,7 @@ button.footer-notification-close-button {
     display: none;
 }
 
-:root[data-average-frequency=false] .frequency-group-item[data-details='Average'] {
+:root:not([data-average-frequency=true]) .frequency-group-item[data-details='Average'] {
     display: none;
 }
 
@@ -2120,3 +2123,9 @@ button.footer-notification-close-button {
     display: none;
 }
 `;
+
+/**
+ * Full extension-equivalent display CSS bundle.
+ * Includes base display styles + structured content styles + pronunciation styles.
+ */
+export const DISPLAY_CSS = `${DISPLAY_BASE_CSS}\n${STRUCTURED_CONTENT_CSS}\n${PRONUNCIATION_CSS}`;

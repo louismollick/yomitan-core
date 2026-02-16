@@ -310,20 +310,24 @@ const fields = await anki.getModelFieldNames('Basic');
 import { parseHTML } from 'linkedom';
 import {
     DisplayGenerator,
-    HtmlTemplateCollection,
     DISPLAY_TEMPLATES,
     DISPLAY_CSS,
+    NoOpContentManager,
+    applyExtensionDisplayDefaults,
 } from 'yomitan-core/render';
 
-const { document } = parseHTML('<!DOCTYPE html><html><body></body></html>');
+const { document } = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>');
+applyExtensionDisplayDefaults(document.documentElement);
 
-const templates = new HtmlTemplateCollection();
-templates.loadFromString(DISPLAY_TEMPLATES, document);
+const style = document.createElement('style');
+style.textContent = DISPLAY_CSS; // Includes display + structured content + pronunciation styles
+document.head.appendChild(style);
 
-const generator = new DisplayGenerator(document, templates);
+const generator = new DisplayGenerator(document, new NoOpContentManager(), DISPLAY_TEMPLATES);
 
 // Render a term entry to DOM nodes
-const node = generator.createTermEntry(dictionaryEntry);
+const node = generator.createTermEntry(dictionaryEntry, dictionaryInfo);
+// Dictionary-specific styles.css from imported dictionaries are injected automatically per entry.
 console.log(node.outerHTML);
 ```
 

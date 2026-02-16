@@ -214,6 +214,11 @@ export class DisplayGenerator {
         }
         definitionsContainer.dataset.count = `${definitions.length}`;
 
+        const dictionaryScopedStyleNode = this._createDictionaryScopedStyleNode(definitions, dictionaryInfo);
+        if (dictionaryScopedStyleNode !== null) {
+            node.appendChild(dictionaryScopedStyleNode);
+        }
+
         return node;
     }
 
@@ -432,6 +437,38 @@ export class DisplayGenerator {
         this._appendMultiple(tagListContainer, this._createTag.bind(this), [...tags, dictionaryTag]);
         this._appendMultiple(onlyListContainer, this._createTermDisambiguation.bind(this), disambiguations);
         this._appendMultiple(entriesContainer, this._createTermDefinitionEntry.bind(this), entries, dictionary);
+        return node;
+    }
+
+    private _createDictionaryScopedStyleNode(
+        definitions: Dictionary.TermDefinition[],
+        dictionaryInfo: DictionaryImporter.Summary[],
+    ): HTMLStyleElement | null {
+        const usedDictionaries = new Set<string>();
+        for (const { dictionary } of definitions) {
+            usedDictionaries.add(dictionary);
+        }
+
+        let scopedCss = '';
+        for (const dictionary of usedDictionaries) {
+            const info = dictionaryInfo.find(({ title }) => title === dictionary);
+            const styles = info?.styles?.trim() ?? '';
+            if (styles.length === 0) {
+                continue;
+            }
+
+            // Match extension behavior: scope dictionary CSS to entry elements using data-dictionary.
+            const escapedTitle = dictionary.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+            scopedCss += `\n[data-dictionary="${escapedTitle}"] {${styles}\n}`;
+        }
+
+        if (scopedCss.length === 0) {
+            return null;
+        }
+
+        const node = this._document.createElement('style');
+        node.className = 'dictionary-entry-styles';
+        node.textContent = scopedCss;
         return node;
     }
 

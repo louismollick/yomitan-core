@@ -45,3 +45,7 @@ export { DISPLAY_TEMPLATES } from './templates/display-templates.js';
 export { DISPLAY_CSS } from './styles/display-styles.js';
 export { STRUCTURED_CONTENT_CSS } from './styles/structured-content-styles.js';
 export { PRONUNCIATION_CSS } from './styles/pronunciation-styles.js';
+export {
+    EXTENSION_DISPLAY_DATASET_DEFAULTS,
+    applyExtensionDisplayDefaults,
+} from './display-render-preset.js';
