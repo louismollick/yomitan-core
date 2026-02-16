@@ -1,6 +1,6 @@
 {
     "name": "yomitan-core",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Core dictionary lookup, language processing, and rendering engine extracted from the Yomitan browser extension.",
     "type": "module",
     "engines": {
