@@ -15,10 +15,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { distributeFurigana } from '../language/ja/furigana';
-import type { FuriganaSegment } from '../language/ja/furigana';
-import type { TermDictionaryEntry } from '../types/dictionary';
-import type { FindTermDictionary } from '../types/translation';
+import { distributeFuriganaInflected, isCodePointJapanese } from '../language/ja/japanese';
+import type { FuriganaSegment } from '../language/ja/japanese';
+import type { TermDictionaryEntry, TermHeadword } from '../types/dictionary';
+import type { FindTermDictionary, FindTermsTextReplacements, SearchResolution } from '../types/translation';
 import type { Translator } from './translator';
 
 export interface ParsedSegment {
@@ -39,32 +39,40 @@ export interface ParsedLine {
     segments: ParsedSegment[];
 }
 
-export interface SentenceParserOptions {
-    /** The enabled dictionary map for lookups. */
-    enabledDictionaryMap: Map<string, { index: number; priority: number }>;
-    /** Maximum character length for substring lookups. Defaults to 20. */
-    maxLength?: number;
+export interface SentenceParserDictionaryInput {
+    index: number;
+    priority?: number;
+    alias?: string;
+    allowSecondarySearches?: boolean;
+    partsOfSpeechFilter?: boolean;
+    useDeinflections?: boolean;
 }
 
-type MatchResult = {
-    length: number;
-    entries: TermDictionaryEntry[];
-    term: string;
-    reading: string;
-};
+export interface SentenceParserOptions {
+    /** The enabled dictionary map for lookups. */
+    enabledDictionaryMap: Map<string, SentenceParserDictionaryInput>;
+    /** Window size used by scanning parser. Defaults to 20. */
+    scanLength?: number;
+    /** Backward compatibility alias for scanLength. */
+    maxLength?: number;
+    /** Search resolution for translator. */
+    searchResolution?: SearchResolution;
+    /** Whether to remove non-Japanese characters in lookups. */
+    removeNonJapaneseCharacters?: boolean;
+    /** Whether to apply deinflection. */
+    deinflect?: boolean;
+    /** Text replacements forwarded to translator. */
+    textReplacements?: FindTermsTextReplacements;
+}
 
-type SegmentCandidate = {
-    to: number;
-    score: number;
-    match: MatchResult;
-};
+interface ParseScanCacheEntry {
+    originalTextLength: number;
+    segments: ParsedSegment[];
+}
 
 /**
- * Parses text into segments with dictionary lookups.
- *
- * The parser enumerates candidate dictionary matches at every position and then
- * chooses a global best path. This avoids greedy local choices such as
- * splitting 会わせて into 会わせ + て and more closely matches extension behavior.
+ * Parses text into segments with dictionary lookups using the same
+ * scanning-parser model as Yomitan extension (non-MeCab path).
  */
 export class SentenceParser {
     private _translator: Translator;
@@ -77,14 +85,14 @@ export class SentenceParser {
      * Parses the given text into lines of parsed segments.
      */
     async parseText(text: string, language: string, options: SentenceParserOptions): Promise<ParsedLine[]> {
-        const maxLength = options.maxLength ?? 20;
+        const scanLength = options.scanLength ?? options.maxLength ?? 20;
         const enabledDictionaryMap = this._buildFindTermDictionaryMap(options.enabledDictionaryMap);
 
         const lines = text.split('\n');
         const results: ParsedLine[] = [];
 
         for (const line of lines) {
-            const segments = await this._parseLine(line, language, enabledDictionaryMap, maxLength);
+            const segments = await this._parseLine(line, language, enabledDictionaryMap, scanLength, options);
             results.push({ segments });
         }
 
@@ -92,207 +100,175 @@ export class SentenceParser {
     }
 
     /**
-     * Parses a single line into segments using global best-path optimization.
+     * Parses a single line using extension-equivalent scanning parser semantics.
      */
     private async _parseLine(
         line: string,
         language: string,
         enabledDictionaryMap: Map<string, FindTermDictionary>,
-        maxLength: number,
+        scanLength: number,
+        options: SentenceParserOptions,
     ): Promise<ParsedSegment[]> {
-        const n = line.length;
-        if (n === 0) {
+        const findTermsOptions = this._createFindTermsOptions(language, enabledDictionaryMap, options);
+        const cache = new Map<string, ParseScanCacheEntry>();
+
+        const result: ParsedSegment[] = [];
+        let previousUngroupedSegment: ParsedSegment | null = null;
+
+        let i = 0;
+        const ii = line.length;
+        while (i < ii) {
+            const codePoint = line.codePointAt(i) as number;
+            const character = String.fromCodePoint(codePoint);
+            const substring = line.substring(i, i + scanLength);
+
+            let cached = cache.get(substring);
+            if (!cached) {
+                const { dictionaryEntries, originalTextLength } = await this._translator.findTerms(
+                    'simple',
+                    substring,
+                    findTermsOptions,
+                );
+
+                let segments: ParsedSegment[] = [];
+
+                if (
+                    dictionaryEntries.length > 0 &&
+                    originalTextLength > 0 &&
+                    (originalTextLength !== character.length || isCodePointJapanese(codePoint))
+                ) {
+                    const source = substring.substring(0, originalTextLength);
+                    segments = this._createMatchedSegments(source, dictionaryEntries);
+                }
+
+                cached = {
+                    originalTextLength,
+                    segments,
+                };
+                cache.set(substring, cached);
+            }
+
+            const { originalTextLength, segments } = cached;
+            if (segments.length > 0) {
+                previousUngroupedSegment = null;
+                result.push(...segments);
+                i += Math.max(1, originalTextLength);
+            } else {
+                if (previousUngroupedSegment === null) {
+                    previousUngroupedSegment = {
+                        text: character,
+                        reading: '',
+                        term: character,
+                        entries: [],
+                        furigana: [{ text: character, reading: '' }],
+                    };
+                    result.push(previousUngroupedSegment);
+                } else {
+                    previousUngroupedSegment.text += character;
+                    previousUngroupedSegment.term = previousUngroupedSegment.text;
+                    previousUngroupedSegment.furigana = [{ text: previousUngroupedSegment.text, reading: '' }];
+                }
+                i += character.length;
+            }
+        }
+
+        return result;
+    }
+
+    private _createMatchedSegments(source: string, dictionaryEntries: TermDictionaryEntry[]): ParsedSegment[] {
+        if (dictionaryEntries.length === 0) {
             return [];
         }
 
-        const findTermsOptions = this._createFindTermsOptions(language, enabledDictionaryMap);
-        const lookupCache = new Map<string, Promise<MatchResult | null>>();
-
-        const lookupMatch = async (substring: string): Promise<MatchResult | null> => {
-            const cached = lookupCache.get(substring);
-            if (cached) {
-                return await cached;
-            }
-
-            const promise = this._translator
-                .findTerms('simple', substring, findTermsOptions)
-                .then(({ dictionaryEntries, originalTextLength }) => {
-                    if (dictionaryEntries.length === 0 || originalTextLength <= 0) {
-                        return null;
-                    }
-
-                    const firstEntry = dictionaryEntries[0];
-                    const headword = firstEntry.headwords[0];
-                    const term = headword?.term ?? substring.substring(0, originalTextLength);
-                    const reading = headword?.reading ?? '';
-
-                    return {
-                        length: originalTextLength,
-                        entries: dictionaryEntries,
-                        term,
-                        reading,
-                    } satisfies MatchResult;
-                })
-                .catch(() => null);
-
-            lookupCache.set(substring, promise);
-            return await promise;
-        };
-
-        const candidatesAt: SegmentCandidate[][] = Array.from({ length: n }, () => []);
-
-        for (let start = 0; start < n; ++start) {
-            const remaining = n - start;
-            const searchLength = Math.min(remaining, maxLength);
-            const byEnd = new Map<number, SegmentCandidate>();
-
-            for (let len = searchLength; len > 0; --len) {
-                const substring = line.substring(start, start + len);
-                const match = await lookupMatch(substring);
-                if (match === null) {
-                    continue;
-                }
-
-                const end = start + match.length;
-                if (end <= start || end > n) {
-                    continue;
-                }
-
-                const surface = line.substring(start, end);
-                const isSurfaceMismatch = match.term.length > 0 && match.term !== surface;
-                // Penalize deinflected surface mismatches slightly to reduce over-greedy tails.
-                const mismatchPenalty = isSurfaceMismatch ? Math.ceil(match.length * 0.75) : 0;
-                const score = match.length * match.length - mismatchPenalty;
-
-                const candidate: SegmentCandidate = { to: end, score, match };
-                const existing = byEnd.get(end);
-                if (!existing || candidate.score > existing.score) {
-                    byEnd.set(end, candidate);
-                }
-            }
-
-            if (byEnd.size === 0) {
-                const char = line.substring(start, start + 1);
-                byEnd.set(start + 1, {
-                    to: start + 1,
-                    // Strongly discourage fallback when dictionary matches exist.
-                    score: -100,
-                    match: {
-                        length: 1,
-                        entries: [],
-                        term: char,
-                        reading: '',
-                    },
-                });
-            }
-
-            candidatesAt[start] = [...byEnd.values()];
+        const firstEntry = dictionaryEntries[0];
+        const firstHeadword = firstEntry.headwords[0];
+        if (!firstHeadword) {
+            return [];
         }
 
-        const bestScore = Array<number>(n + 1).fill(Number.NEGATIVE_INFINITY);
-        const bestChoice = Array<SegmentCandidate | null>(n + 1).fill(null);
-        bestScore[n] = 0;
+        const reading = firstHeadword.reading ?? '';
+        const term = firstHeadword.term ?? source;
 
-        for (let i = n - 1; i >= 0; --i) {
-            for (const candidate of candidatesAt[i]) {
-                const continuation = bestScore[candidate.to];
-                if (!Number.isFinite(continuation)) {
-                    continue;
-                }
+        const furigana = distributeFuriganaInflected(term, reading, source);
+        const filteredEntries = this._trimEntriesForSource(dictionaryEntries, source);
 
-                // Small per-token penalty to prefer fewer, longer segments.
-                const score = candidate.score + continuation - 1;
-                const previous = bestScore[i];
-                const previousChoice = bestChoice[i];
-
-                const isBetter =
-                    score > previous ||
-                    (score === previous &&
-                        previousChoice !== null &&
-                        candidate.match.length > previousChoice.match.length);
-
-                if (isBetter || previousChoice === null) {
-                    bestScore[i] = score;
-                    bestChoice[i] = candidate;
-                }
-            }
-        }
-
-        const segments: ParsedSegment[] = [];
-        let position = 0;
-
-        while (position < n) {
-            const choice = bestChoice[position];
-            if (!choice || choice.to <= position) {
-                // Safety fallback if DP path is unexpectedly incomplete.
-                const char = line.substring(position, position + 1);
-                segments.push({
-                    text: char,
-                    reading: '',
-                    term: char,
-                    entries: [],
-                    furigana: [{ text: char, reading: '' }],
-                });
-                position += char.length;
-                continue;
-            }
-
-            const surfaceText = line.substring(position, choice.to);
-            const furigana =
-                language === 'ja'
-                    ? distributeFurigana(surfaceText, choice.match.reading)
-                    : [{ text: surfaceText, reading: '' }];
-
-            segments.push({
-                text: surfaceText,
-                reading: choice.match.reading,
-                term: choice.match.term,
-                entries: choice.match.entries,
+        return [
+            {
+                text: source,
+                reading,
+                term,
+                entries: filteredEntries,
                 furigana,
-            });
+            },
+        ];
+    }
 
-            position = choice.to;
+    private _trimEntriesForSource(dictionaryEntries: TermDictionaryEntry[], source: string): TermDictionaryEntry[] {
+        const trimmed: TermDictionaryEntry[] = [];
+
+        for (const entry of dictionaryEntries) {
+            const headwords: TermHeadword[] = [];
+            for (const headword of entry.headwords) {
+                const validSources = headword.sources.filter(
+                    (src) => src.originalText === source && src.isPrimary && src.matchType === 'exact',
+                );
+
+                if (validSources.length > 0) {
+                    headwords.push({ ...headword, sources: validSources });
+                }
+            }
+
+            if (headwords.length > 0) {
+                trimmed.push({ ...entry, headwords });
+            }
         }
 
-        return segments;
+        return trimmed.length > 0 ? trimmed : dictionaryEntries;
     }
 
     /**
-     * Builds a FindTermDictionary map from the simplified input format.
+     * Builds a FindTermDictionary map from the input format.
      */
     private _buildFindTermDictionaryMap(
-        inputMap: Map<string, { index: number; priority: number }>,
+        inputMap: Map<string, SentenceParserDictionaryInput>,
     ): Map<string, FindTermDictionary> {
         const result = new Map<string, FindTermDictionary>();
-        for (const [name, { index }] of inputMap.entries()) {
+
+        for (const [name, config] of inputMap.entries()) {
             result.set(name, {
-                index,
-                alias: name,
-                allowSecondarySearches: false,
-                partsOfSpeechFilter: true,
-                useDeinflections: true,
+                index: config.index,
+                alias: config.alias ?? name,
+                allowSecondarySearches: config.allowSecondarySearches ?? false,
+                partsOfSpeechFilter: config.partsOfSpeechFilter ?? true,
+                useDeinflections: config.useDeinflections ?? true,
             });
         }
+
         return result;
     }
 
     /**
-     * Creates a FindTermsOptions for simple lookup.
+     * Creates a FindTermsOptions object for scanning parser lookups.
      */
-    private _createFindTermsOptions(language: string, enabledDictionaryMap: Map<string, FindTermDictionary>) {
+    private _createFindTermsOptions(
+        language: string,
+        enabledDictionaryMap: Map<string, FindTermDictionary>,
+        options: SentenceParserOptions,
+    ) {
         return {
             matchType: 'exact' as const,
-            deinflect: true,
+            deinflect: options.deinflect ?? true,
             primaryReading: '',
             mainDictionary: '',
             sortFrequencyDictionary: null,
             sortFrequencyDictionaryOrder: 'descending' as const,
             removeNonJapaneseCharacters:
-                language === 'ja' || language === 'zh' || language === 'yue' || language === 'ko',
-            textReplacements: [null],
+                options.removeNonJapaneseCharacters ??
+                (language === 'ja' || language === 'zh' || language === 'yue' || language === 'ko'),
+            textReplacements: options.textReplacements ?? [null],
             enabledDictionaryMap,
             excludeDictionaryDefinitions: null,
-            searchResolution: 'letter' as const,
+            searchResolution: options.searchResolution ?? ('letter' as const),
             language,
         };
     }

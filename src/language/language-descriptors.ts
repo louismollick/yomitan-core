@@ -1,5 +1,16 @@
 import type { LanguageDescriptorAny } from '../types/language';
 import { normalizeRadicalCharacters } from './cjk-util';
+import {
+    alphabeticToHiragana,
+    alphanumericWidthVariants,
+    collapseEmphaticSequences,
+    convertHalfWidthCharacters,
+    convertHiraganaToKatakana,
+    normalizeCJKCompatibilityCharacters,
+    normalizeCombiningCharacters,
+} from './ja/japanese-text-preprocessors';
+import { japaneseTransforms } from './ja/japanese-transforms';
+import { isStringPartiallyJapanese } from './ja/japanese';
 import { capitalizeFirstLetter, decapitalize, removeAlphabeticDiacritics } from './text-processors';
 
 const capitalizationPreprocessors = {
@@ -125,7 +136,23 @@ const languageDescriptors: LanguageDescriptorAny[] = [
         exampleText: 'lasīt',
         textPreprocessors: capitalizationPreprocessors,
     },
-    { iso: 'ja', iso639_3: 'jpn', name: 'Japanese', exampleText: '読め' },
+    {
+        iso: 'ja',
+        iso639_3: 'jpn',
+        name: 'Japanese',
+        exampleText: '読め',
+        textPreprocessors: {
+            convertHalfWidthCharacters,
+            alphabeticToHiragana,
+            alphanumericWidthVariants,
+            convertHiraganaToKatakana,
+            collapseEmphaticSequences,
+            normalizeCombiningCharacters,
+            normalizeCJKCompatibilityCharacters,
+        },
+        languageTransforms: japaneseTransforms,
+        isTextLookupWorthy: isStringPartiallyJapanese,
+    },
     { iso: 'ka', iso639_3: 'kat', name: 'Georgian', exampleText: 'კითხვა' },
     { iso: 'kn', iso639_3: 'kan', name: 'Kannada', exampleText: 'ಓದು' },
     { iso: 'km', iso639_3: 'khm', name: 'Khmer', exampleText: 'អាន' },

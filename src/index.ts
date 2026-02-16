@@ -226,8 +226,23 @@ export class YomitanCore {
         text: string,
         options: {
             language?: string;
-            enabledDictionaryMap: Map<string, { index: number; priority: number }>;
+            enabledDictionaryMap: Map<
+                string,
+                {
+                    index: number;
+                    priority?: number;
+                    alias?: string;
+                    allowSecondarySearches?: boolean;
+                    partsOfSpeechFilter?: boolean;
+                    useDeinflections?: boolean;
+                }
+            >;
+            scanLength?: number;
             maxLength?: number;
+            searchResolution?: 'letter' | 'word';
+            removeNonJapaneseCharacters?: boolean;
+            deinflect?: boolean;
+            textReplacements?: (import('./types/translation').FindTermsTextReplacement[] | null)[];
         },
     ): Promise<unknown[]> {
         this._ensureInitialized();
@@ -238,7 +253,12 @@ export class YomitanCore {
         }
         return await this._sentenceParser.parseText(text, options.language ?? 'ja', {
             enabledDictionaryMap: options.enabledDictionaryMap,
+            scanLength: options.scanLength,
             maxLength: options.maxLength,
+            searchResolution: options.searchResolution,
+            removeNonJapaneseCharacters: options.removeNonJapaneseCharacters,
+            deinflect: options.deinflect,
+            textReplacements: options.textReplacements,
         });
     }
 
