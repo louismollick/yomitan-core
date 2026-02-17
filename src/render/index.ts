@@ -49,3 +49,10 @@ export {
     EXTENSION_DISPLAY_DATASET_DEFAULTS,
     applyExtensionDisplayDefaults,
 } from './display-render-preset.js';
+export { applyPopupTheme, resolvePopupTheme } from './popup-theme.js';
+export type {
+    PopupTheme,
+    PopupThemeResolveOptions,
+    ResolvedPopupThemeInfo,
+    ResolvedTheme,
+} from './popup-theme.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { distributeFuriganaInflected, isCodePointJapanese } from '../src/language/ja/japanese';
+import { isCodePointJapanese } from '../src/language/ja/japanese';
 import { SentenceParser } from '../src/lookup/sentence-parser';
 import type { TermDictionaryEntry } from '../src/types/dictionary';
 
@@ -97,10 +97,8 @@ async function extensionStyleScan(text: string, scanLength: number) {
             (originalTextLength !== character.length || isCodePointJapanese(codePoint))
         ) {
             previousUngrouped = null;
-            const { headwords: [{ term, reading }] } = dictionaryEntries[0];
             const source = substring.substring(0, originalTextLength);
-            const segments = distributeFuriganaInflected(term, reading, source);
-            result.push(segments.map((s) => s.text).join(''));
+            result.push(source);
             i += originalTextLength;
         } else {
             if (previousUngrouped === null) {
@@ -128,8 +126,11 @@ describe('SentenceParser (scanning parser parity)', () => {
         });
 
         expect(result).toHaveLength(1);
-        expect(result[0].segments.map((s) => s.text)).toEqual(['ボス', 'に', '会わせて', 'くれ']);
-        expect(result[0].segments.map((s) => s.term)).toEqual(['ボス', 'に', '会わせる', 'くれる']);
+        expect(result[0].map((s) => s.text)).toEqual(['ボス', 'に', '会わせて', 'くれ']);
+        expect(result[0][0].headwords?.[0][0].term).toBe('ボス');
+        expect(result[0][1].headwords?.[0][0].term).toBe('に');
+        expect(result[0][2].headwords?.[0][0].term).toBe('会わせる');
+        expect(result[0][3].headwords?.[0][0].term).toBe('くれる');
     });
 
     it('matches extension-style scanning parser behavior for same translator outputs', async () => {
@@ -144,6 +145,20 @@ describe('SentenceParser (scanning parser parity)', () => {
             scanLength: 20,
         });
 
-        expect(parsed[0].segments.map((s) => s.text)).toEqual(expected);
+        expect(parsed[0].map((s) => s.text)).toEqual(expected);
+    });
+
+    it('keeps unmatched punctuation grouped and non-actionable', async () => {
+        const parser = new SentenceParser(translatorMock as any);
+        const parsed = await parser.parseText('、。！？', 'ja', {
+            enabledDictionaryMap: new Map([
+                ['TestDict', { index: 0, alias: 'TestDict', useDeinflections: true, partsOfSpeechFilter: true }],
+            ]),
+            scanLength: 20,
+        });
+
+        expect(parsed).toHaveLength(1);
+        expect(parsed[0]).toEqual([{ text: '、。！？', reading: '' }]);
+        expect(parsed[0][0].headwords).toBeUndefined();
     });
 });

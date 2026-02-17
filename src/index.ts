@@ -5,6 +5,7 @@ import { getAllLanguageTextProcessors, getLanguageSummaries, isTextLookupWorthy 
 import { MultiLanguageTransformer } from './language/multi-language-transformer';
 import type { BatchProcessor as BatchProcessorClass } from './lookup/batch-processor';
 import type { FrequencyRanker as FrequencyRankerClass } from './lookup/frequency-ranking';
+import type { ParseTextResultItem } from './lookup/sentence-parser';
 import type { SentenceParser as SentenceParserClass } from './lookup/sentence-parser';
 import type { FindTermsMode, Translator as TranslatorClass } from './lookup/translator';
 import type * as Dictionary from './types/dictionary';
@@ -244,14 +245,14 @@ export class YomitanCore {
             deinflect?: boolean;
             textReplacements?: (import('./types/translation').FindTermsTextReplacement[] | null)[];
         },
-    ): Promise<unknown[]> {
+    ): Promise<ParseTextResultItem[]> {
         this._ensureInitialized();
         if (!this._sentenceParser) {
             const translator = await this.getTranslator();
             const { SentenceParser } = await import('./lookup/sentence-parser');
             this._sentenceParser = new SentenceParser(translator);
         }
-        return await this._sentenceParser.parseText(text, options.language ?? 'ja', {
+        const parsedLines = await this._sentenceParser.parseText(text, options.language ?? 'ja', {
             enabledDictionaryMap: options.enabledDictionaryMap,
             scanLength: options.scanLength,
             maxLength: options.maxLength,
@@ -260,6 +261,16 @@ export class YomitanCore {
             deinflect: options.deinflect,
             textReplacements: options.textReplacements,
         });
+
+        return [
+            {
+                id: 'scan',
+                source: 'scanning-parser',
+                dictionary: null,
+                index: 0,
+                content: parsedLines,
+            },
+        ];
     }
 
     async generateFurigana(text: string, reading: string): Promise<FuriganaSegment[]> {

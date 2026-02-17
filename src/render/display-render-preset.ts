@@ -15,6 +15,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { applyPopupTheme } from './popup-theme.js';
+import type { PopupThemeResolveOptions } from './popup-theme.js';
+
 /**
  * Default document dataset values used by Yomitan extension popup rendering.
  * These values drive conditional display CSS behavior.
@@ -43,9 +46,16 @@ export const EXTENSION_DISPLAY_DATASET_DEFAULTS = {
  * Applies extension-equivalent rendering defaults to an HTML element dataset.
  * Typically this should be called with `document.documentElement`.
  */
-export function applyExtensionDisplayDefaults(documentElement: HTMLElement): void {
+export function applyExtensionDisplayDefaults(
+    documentElement: HTMLElement,
+    options?: {
+        popupTheme?: PopupThemeResolveOptions;
+    },
+): void {
     for (const [key, value] of Object.entries(EXTENSION_DISPLAY_DATASET_DEFAULTS)) {
         documentElement.dataset[key] = value;
     }
+    if (typeof options?.popupTheme !== 'undefined') {
+        applyPopupTheme(documentElement, options.popupTheme);
+    }
 }
-

@@ -1,5 +1,7 @@
 import type { BidirectionalConversionPreprocessor, TextProcessor } from '../../types/language';
 import { basicTextProcessorOptions } from '../text-processors';
+import itaijiList from 'kanji-processor/dist/itaiji_list.json';
+import mappings from 'kanji-processor/dist/full_list.json';
 import {
     collapseEmphaticSequences as collapseEmphaticSequencesFunction,
     convertAlphanumericToFullWidth,
@@ -11,6 +13,23 @@ import {
     normalizeCombiningCharacters as normalizeCombiningCharactersFunction,
 } from './japanese';
 import { convertAlphabeticToKana } from './japanese-wanakana';
+
+let kanjiVariantRegex: RegExp | null = null;
+let kanjiVariantMap: Map<string, string> | null = null;
+
+function convertVariants(text: string): string {
+    if (kanjiVariantRegex === null || kanjiVariantMap === null) {
+        kanjiVariantRegex = new RegExp(`[${itaijiList.join('')}]`, 'g');
+        kanjiVariantMap = new Map<string, string>();
+        for (const mapping of mappings) {
+            for (const itaiji of mapping.itaiji) {
+                kanjiVariantMap.set(itaiji, mapping.oyaji);
+            }
+        }
+    }
+
+    return text.replace(kanjiVariantRegex, (match) => kanjiVariantMap?.get(match) ?? match);
+}
 
 export const convertHalfWidthCharacters: TextProcessor<boolean> = {
     name: 'Convert half width characters to full width',
@@ -88,4 +107,11 @@ export const normalizeCJKCompatibilityCharacters: TextProcessor<boolean> = {
     description: '\u3300 \u2192 \u30a2\u30d1\u30fc\u30c8',
     options: basicTextProcessorOptions,
     process: (str, setting) => (setting ? normalizeCJKCompatibilityCharactersFunction(str) : str),
+};
+
+export const standardizeKanji: TextProcessor<boolean> = {
+    name: 'Convert kanji variants to their modern standard form',
+    description: '\u842c \u2192 \u4e07',
+    options: basicTextProcessorOptions,
+    process: (str, setting) => (setting ? convertVariants(str) : str),
 };

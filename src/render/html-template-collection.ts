@@ -39,7 +39,13 @@ export class HtmlTemplateCollection {
      * @param html - The HTML string containing `<template>` elements.
      */
     loadFromString(html: string): void {
-        const parser = new (this._document.defaultView as unknown as { DOMParser: typeof DOMParser }).DOMParser();
+        const DOMParserConstructor =
+            (this._document.defaultView as unknown as { DOMParser?: typeof DOMParser } | null)?.DOMParser ??
+            globalThis.DOMParser;
+        if (typeof DOMParserConstructor !== 'function') {
+            throw new Error('DOMParser is unavailable for HtmlTemplateCollection.');
+        }
+        const parser = new DOMParserConstructor();
         const templatesDocument = parser.parseFromString(html, 'text/html');
         this.load(templatesDocument);
     }

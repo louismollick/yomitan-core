@@ -314,13 +314,20 @@ import {
     DISPLAY_CSS,
     NoOpContentManager,
     applyExtensionDisplayDefaults,
+    applyPopupTheme,
 } from 'yomitan-core/render';
 
 const { document } = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>');
 applyExtensionDisplayDefaults(document.documentElement);
 
+// Optional: control popup body theme mode (light | dark | browser | site).
+applyPopupTheme(document.documentElement, {theme: 'dark'});
+// Equivalent examples:
+// applyPopupTheme(document.documentElement, {theme: 'browser'});
+// applyPopupTheme(document.documentElement, {theme: 'site', siteTheme: 'light'});
+
 const style = document.createElement('style');
-style.textContent = DISPLAY_CSS; // Includes display + structured content + pronunciation styles
+style.textContent = DISPLAY_CSS; // Includes display + structured content + pronunciation styles; uses data-theme for popup body theme
 document.head.appendChild(style);
 
 const generator = new DisplayGenerator(document, new NoOpContentManager(), DISPLAY_TEMPLATES);

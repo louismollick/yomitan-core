@@ -1,4 +1,5 @@
 export type * from './core';
+export type * from './parse';
 export type * from './structured-content';
 export type * from './dictionary';
 export type * from './dictionary-importer';

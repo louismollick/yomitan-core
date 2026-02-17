@@ -1,15 +1,16 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 
-import type { Summary } from '../src/types/dictionary-importer';
-import type { Tag, TermDictionaryEntry } from '../src/types/dictionary';
 import {
     DISPLAY_CSS,
     DISPLAY_TEMPLATES,
     DisplayGenerator,
     NoOpContentManager,
     applyExtensionDisplayDefaults,
+    applyPopupTheme,
 } from '../src/render';
+import type { Tag, TermDictionaryEntry } from '../src/types/dictionary';
+import type { Summary } from '../src/types/dictionary-importer';
 
 function createTag(name: string, category = 'partOfSpeech'): Tag {
     return {
@@ -114,13 +115,33 @@ describe('render extension parity contracts', () => {
         expect(data.popupActionBarLocation).toBe('top');
     });
 
+    it('applyExtensionDisplayDefaults can apply popup theme attributes', () => {
+        const { window } = new JSDOM('<!doctype html><html><body></body></html>');
+        applyExtensionDisplayDefaults(window.document.documentElement, {
+            popupTheme: { theme: 'dark', browserTheme: 'light' },
+        });
+
+        const data = window.document.documentElement.dataset;
+        expect(data.theme).toBe('dark');
+        expect(data.themeRaw).toBe('dark');
+        expect(data.siteTheme).toBeDefined();
+        expect(data.browserTheme).toBe('light');
+    });
+
+    it('applyPopupTheme writes resolved theme metadata', () => {
+        const { window } = new JSDOM('<!doctype html><html><body></body></html>');
+        applyPopupTheme(window.document.documentElement, { theme: 'browser', browserTheme: 'dark' });
+
+        const data = window.document.documentElement.dataset;
+        expect(data.theme).toBe('dark');
+        expect(data.themeRaw).toBe('browser');
+        expect(data.browserTheme).toBe('dark');
+        expect(data.siteTheme).toBeDefined();
+    });
+
     it('injects dictionary-scoped styles for dictionaries used in rendered definitions', () => {
         const { window } = new JSDOM('<!doctype html><html><body></body></html>');
-        const generator = new DisplayGenerator(
-            window.document,
-            new NoOpContentManager(),
-            DISPLAY_TEMPLATES,
-        );
+        const generator = new DisplayGenerator(window.document, new NoOpContentManager(), DISPLAY_TEMPLATES);
 
         const node = generator.createTermEntry(
             createTermEntry(),
@@ -135,18 +156,15 @@ describe('render extension parity contracts', () => {
 
     it('does not inject dictionary style node when dictionary styles are empty', () => {
         const { window } = new JSDOM('<!doctype html><html><body></body></html>');
-        const generator = new DisplayGenerator(
-            window.document,
-            new NoOpContentManager(),
-            DISPLAY_TEMPLATES,
-        );
+        const generator = new DisplayGenerator(window.document, new NoOpContentManager(), DISPLAY_TEMPLATES);
 
         const node = generator.createTermEntry(createTermEntry(), createDictionaryInfo(''));
         expect(node.querySelector('style.dictionary-entry-styles')).toBeNull();
     });
 
     it('hides average frequency unless data-average-frequency=true', () => {
-        expect(DISPLAY_CSS).toContain(":root:not([data-average-frequency=true]) .frequency-group-item[data-details='Average']");
+        expect(DISPLAY_CSS).toContain(
+            ":root:not([data-average-frequency=true]) .frequency-group-item[data-details='Average']",
+        );
     });
 });
-

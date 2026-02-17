@@ -8,6 +8,7 @@ import {
     convertHiraganaToKatakana,
     normalizeCJKCompatibilityCharacters,
     normalizeCombiningCharacters,
+    standardizeKanji,
 } from './ja/japanese-text-preprocessors';
 import { japaneseTransforms } from './ja/japanese-transforms';
 import { isStringPartiallyJapanese } from './ja/japanese';
@@ -144,11 +145,13 @@ const languageDescriptors: LanguageDescriptorAny[] = [
         textPreprocessors: {
             convertHalfWidthCharacters,
             alphabeticToHiragana,
+            normalizeCombiningCharacters,
+            normalizeCJKCompatibilityCharacters,
+            normalizeRadicalCharacters,
             alphanumericWidthVariants,
             convertHiraganaToKatakana,
             collapseEmphaticSequences,
-            normalizeCombiningCharacters,
-            normalizeCJKCompatibilityCharacters,
+            standardizeKanji,
         },
         languageTransforms: japaneseTransforms,
         isTextLookupWorthy: isStringPartiallyJapanese,

@@ -15,29 +15,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { distributeFuriganaInflected, isCodePointJapanese } from '../language/ja/japanese';
-import type { FuriganaSegment } from '../language/ja/japanese';
-import type { TermDictionaryEntry, TermHeadword } from '../types/dictionary';
+import { isCodePointJapanese } from '../language/ja/japanese';
+import type { TermDictionaryEntry } from '../types/dictionary';
+import type { ParseTextHeadword, ParseTextLine, ParseTextSegment } from '../types/parse';
 import type { FindTermDictionary, FindTermsTextReplacements, SearchResolution } from '../types/translation';
 import type { Translator } from './translator';
-
-export interface ParsedSegment {
-    /** The surface text of this segment. */
-    text: string;
-    /** The reading (furigana) for this segment, or empty string if no reading. */
-    reading: string;
-    /** The dictionary form (headword term) matched for this segment, or the surface text if no match. */
-    term: string;
-    /** The dictionary entries found for this segment. */
-    entries: TermDictionaryEntry[];
-    /** Furigana distribution for this segment. */
-    furigana: FuriganaSegment[];
-}
-
-export interface ParsedLine {
-    /** The parsed segments for this line. */
-    segments: ParsedSegment[];
-}
+export type { ParseTextHeadword, ParseTextLine, ParseTextResultItem, ParseTextSegment } from '../types/parse';
 
 export interface SentenceParserDictionaryInput {
     index: number;
@@ -67,7 +50,7 @@ export interface SentenceParserOptions {
 
 interface ParseScanCacheEntry {
     originalTextLength: number;
-    segments: ParsedSegment[];
+    segments: ParseTextSegment[];
 }
 
 /**
@@ -84,16 +67,16 @@ export class SentenceParser {
     /**
      * Parses the given text into lines of parsed segments.
      */
-    async parseText(text: string, language: string, options: SentenceParserOptions): Promise<ParsedLine[]> {
+    async parseText(text: string, language: string, options: SentenceParserOptions): Promise<ParseTextLine[]> {
         const scanLength = options.scanLength ?? options.maxLength ?? 20;
         const enabledDictionaryMap = this._buildFindTermDictionaryMap(options.enabledDictionaryMap);
 
         const lines = text.split('\n');
-        const results: ParsedLine[] = [];
+        const results: ParseTextLine[] = [];
 
         for (const line of lines) {
             const segments = await this._parseLine(line, language, enabledDictionaryMap, scanLength, options);
-            results.push({ segments });
+            results.push(segments);
         }
 
         return results;
@@ -108,12 +91,12 @@ export class SentenceParser {
         enabledDictionaryMap: Map<string, FindTermDictionary>,
         scanLength: number,
         options: SentenceParserOptions,
-    ): Promise<ParsedSegment[]> {
+    ): Promise<ParseTextLine> {
         const findTermsOptions = this._createFindTermsOptions(language, enabledDictionaryMap, options);
         const cache = new Map<string, ParseScanCacheEntry>();
 
-        const result: ParsedSegment[] = [];
-        let previousUngroupedSegment: ParsedSegment | null = null;
+        const result: ParseTextSegment[] = [];
+        let previousUngroupedSegment: ParseTextSegment | null = null;
 
         let i = 0;
         const ii = line.length;
@@ -130,7 +113,7 @@ export class SentenceParser {
                     findTermsOptions,
                 );
 
-                let segments: ParsedSegment[] = [];
+                let segments: ParseTextSegment[] = [];
 
                 if (
                     dictionaryEntries.length > 0 &&
@@ -157,16 +140,11 @@ export class SentenceParser {
                 if (previousUngroupedSegment === null) {
                     previousUngroupedSegment = {
                         text: character,
-                        reading: '',
-                        term: character,
-                        entries: [],
-                        furigana: [{ text: character, reading: '' }],
+                        reading: ''
                     };
                     result.push(previousUngroupedSegment);
                 } else {
                     previousUngroupedSegment.text += character;
-                    previousUngroupedSegment.term = previousUngroupedSegment.text;
-                    previousUngroupedSegment.furigana = [{ text: previousUngroupedSegment.text, reading: '' }];
                 }
                 i += character.length;
             }
@@ -175,7 +153,7 @@ export class SentenceParser {
         return result;
     }
 
-    private _createMatchedSegments(source: string, dictionaryEntries: TermDictionaryEntry[]): ParsedSegment[] {
+    private _createMatchedSegments(source: string, dictionaryEntries: TermDictionaryEntry[]): ParseTextSegment[] {
         if (dictionaryEntries.length === 0) {
             return [];
         }
@@ -186,44 +164,34 @@ export class SentenceParser {
             return [];
         }
 
-        const reading = firstHeadword.reading ?? '';
-        const term = firstHeadword.term ?? source;
-
-        const furigana = distributeFuriganaInflected(term, reading, source);
-        const filteredEntries = this._trimEntriesForSource(dictionaryEntries, source);
-
-        return [
-            {
-                text: source,
-                reading,
-                term,
-                entries: filteredEntries,
-                furigana,
-            },
-        ];
-    }
-
-    private _trimEntriesForSource(dictionaryEntries: TermDictionaryEntry[], source: string): TermDictionaryEntry[] {
-        const trimmed: TermDictionaryEntry[] = [];
-
-        for (const entry of dictionaryEntries) {
-            const headwords: TermHeadword[] = [];
-            for (const headword of entry.headwords) {
+        const trimmedHeadwords: ParseTextHeadword[][] = [];
+        for (const dictionaryEntry of dictionaryEntries) {
+            const validHeadwords: ParseTextHeadword[] = [];
+            for (const headword of dictionaryEntry.headwords) {
                 const validSources = headword.sources.filter(
                     (src) => src.originalText === source && src.isPrimary && src.matchType === 'exact',
                 );
 
                 if (validSources.length > 0) {
-                    headwords.push({ ...headword, sources: validSources });
+                    validHeadwords.push({
+                        term: headword.term,
+                        reading: headword.reading,
+                        sources: validSources,
+                    });
                 }
             }
-
-            if (headwords.length > 0) {
-                trimmed.push({ ...entry, headwords });
+            if (validHeadwords.length > 0) {
+                trimmedHeadwords.push(validHeadwords);
             }
         }
 
-        return trimmed.length > 0 ? trimmed : dictionaryEntries;
+        return [
+            {
+                text: source,
+                reading: firstHeadword.reading ?? '',
+                ...(trimmedHeadwords.length > 0 ? { headwords: trimmedHeadwords } : {}),
+            },
+        ];
     }
 
     /**
