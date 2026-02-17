@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/louismollick/yomitan-core/compare/v1.0.2...v1.1.0) (2026-02-17)
+
+
+### Features
+
+* add popup themes & improve parser types ([99f6703](https://github.com/louismollick/yomitan-core/commit/99f67033083e2524c94618769f5f0b3954550490))
+
 ## [1.0.2](https://github.com/louismollick/yomitan-core/compare/v1.0.1...v1.0.2) (2026-02-16)
 
 
