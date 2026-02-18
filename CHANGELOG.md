@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/louismollick/yomitan-core/compare/v1.1.0...v1.2.0) (2026-02-18)
+
+
+### Features
+
+* add debug logs ([49ec951](https://github.com/louismollick/yomitan-core/commit/49ec951d616eac377a63d96b400e4f089fc1046b))
+
 # [1.1.0](https://github.com/louismollick/yomitan-core/compare/v1.0.2...v1.1.0) (2026-02-17)
 
 
