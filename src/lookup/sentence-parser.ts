@@ -19,6 +19,7 @@ import { isCodePointJapanese } from '../language/ja/japanese';
 import type { TermDictionaryEntry } from '../types/dictionary';
 import type { ParseTextHeadword, ParseTextLine, ParseTextSegment } from '../types/parse';
 import type { FindTermDictionary, FindTermsTextReplacements, SearchResolution } from '../types/translation';
+import { codePointPreview, debugYomitanCore } from '../util/debug';
 import type { Translator } from './translator';
 export type { ParseTextHeadword, ParseTextLine, ParseTextResultItem, ParseTextSegment } from '../types/parse';
 
@@ -70,14 +71,37 @@ export class SentenceParser {
     async parseText(text: string, language: string, options: SentenceParserOptions): Promise<ParseTextLine[]> {
         const scanLength = options.scanLength ?? options.maxLength ?? 20;
         const enabledDictionaryMap = this._buildFindTermDictionaryMap(options.enabledDictionaryMap);
+        debugYomitanCore('sentence-parser', 'parseText:start', {
+            textLength: text.length,
+            textPreview: text.slice(0, 120),
+            textCodePoints: codePointPreview(text),
+            lineCount: text.split('\n').length,
+            scanLength,
+            language,
+            enabledDictionaryCount: enabledDictionaryMap.size,
+            enabledDictionaryNames: [...enabledDictionaryMap.keys()],
+            searchResolution: options.searchResolution ?? 'letter',
+            removeNonJapaneseCharacters: options.removeNonJapaneseCharacters,
+            deinflect: options.deinflect,
+        });
 
         const lines = text.split('\n');
         const results: ParseTextLine[] = [];
 
-        for (const line of lines) {
-            const segments = await this._parseLine(line, language, enabledDictionaryMap, scanLength, options);
+        for (const [lineIndex, line] of lines.entries()) {
+            const segments = await this._parseLine(line, lineIndex, language, enabledDictionaryMap, scanLength, options);
             results.push(segments);
         }
+
+        debugYomitanCore('sentence-parser', 'parseText:complete', {
+            lineCount: results.length,
+            lineSegmentCounts: results.map((line) => line.length),
+            totalSegments: results.reduce((count, line) => count + line.length, 0),
+            matchedSegments: results.reduce(
+                (count, line) => count + line.filter((segment) => Array.isArray(segment.headwords)).length,
+                0,
+            ),
+        });
 
         return results;
     }
@@ -87,6 +111,7 @@ export class SentenceParser {
      */
     private async _parseLine(
         line: string,
+        lineIndex: number,
         language: string,
         enabledDictionaryMap: Map<string, FindTermDictionary>,
         scanLength: number,
@@ -97,6 +122,13 @@ export class SentenceParser {
 
         const result: ParseTextSegment[] = [];
         let previousUngroupedSegment: ParseTextSegment | null = null;
+        let lookupCount = 0;
+        let cacheHits = 0;
+        let cacheMisses = 0;
+        let matchedSegmentCount = 0;
+        let unmatchedSegmentCount = 0;
+        let emptyEntryLookups = 0;
+        const lookupMissSamples: Array<{ substring: string; codePoints: string[]; originalTextLength: number }> = [];
 
         let i = 0;
         const ii = line.length;
@@ -107,13 +139,25 @@ export class SentenceParser {
 
             let cached = cache.get(substring);
             if (!cached) {
+                cacheMisses += 1;
                 const { dictionaryEntries, originalTextLength } = await this._translator.findTerms(
                     'simple',
                     substring,
                     findTermsOptions,
                 );
+                lookupCount += 1;
 
                 let segments: ParseTextSegment[] = [];
+                if (dictionaryEntries.length === 0) {
+                    emptyEntryLookups += 1;
+                    if (lookupMissSamples.length < 5) {
+                        lookupMissSamples.push({
+                            substring: substring.slice(0, 40),
+                            codePoints: codePointPreview(substring, 20),
+                            originalTextLength,
+                        });
+                    }
+                }
 
                 if (
                     dictionaryEntries.length > 0 &&
@@ -129,12 +173,15 @@ export class SentenceParser {
                     segments,
                 };
                 cache.set(substring, cached);
+            } else {
+                cacheHits += 1;
             }
 
             const { originalTextLength, segments } = cached;
             if (segments.length > 0) {
                 previousUngroupedSegment = null;
                 result.push(...segments);
+                matchedSegmentCount += segments.length;
                 i += Math.max(1, originalTextLength);
             } else {
                 if (previousUngroupedSegment === null) {
@@ -143,12 +190,27 @@ export class SentenceParser {
                         reading: ''
                     };
                     result.push(previousUngroupedSegment);
+                    unmatchedSegmentCount += 1;
                 } else {
                     previousUngroupedSegment.text += character;
                 }
                 i += character.length;
             }
         }
+
+        debugYomitanCore('sentence-parser', 'parseLine:complete', {
+            lineIndex,
+            lineLength: line.length,
+            linePreview: line.slice(0, 120),
+            lookupCount,
+            cacheHits,
+            cacheMisses,
+            emptyEntryLookups,
+            matchedSegmentCount,
+            unmatchedSegmentCount,
+            finalSegmentCount: result.length,
+            missSamples: lookupMissSamples,
+        });
 
         return result;
     }

@@ -12,6 +12,7 @@ import type * as Dictionary from './types/dictionary';
 import type * as DictionaryDatabase from './types/dictionary-database';
 import type * as DictionaryImporterTypes from './types/dictionary-importer';
 import type * as Translation from './types/translation';
+import { codePointPreview, debugYomitanCore } from './util/debug';
 
 // Re-export all types
 export * from './types/index';
@@ -247,6 +248,19 @@ export class YomitanCore {
         },
     ): Promise<ParseTextResultItem[]> {
         this._ensureInitialized();
+        debugYomitanCore('index', 'parseText:start', {
+            textLength: text.length,
+            textPreview: text.slice(0, 120),
+            textCodePoints: codePointPreview(text),
+            language: options.language ?? 'ja',
+            enabledDictionaryCount: options.enabledDictionaryMap.size,
+            enabledDictionaryNames: [...options.enabledDictionaryMap.keys()],
+            scanLength: options.scanLength ?? options.maxLength ?? 20,
+            searchResolution: options.searchResolution ?? 'letter',
+            removeNonJapaneseCharacters: options.removeNonJapaneseCharacters,
+            deinflect: options.deinflect,
+        });
+
         if (!this._sentenceParser) {
             const translator = await this.getTranslator();
             const { SentenceParser } = await import('./lookup/sentence-parser');
@@ -260,6 +274,15 @@ export class YomitanCore {
             removeNonJapaneseCharacters: options.removeNonJapaneseCharacters,
             deinflect: options.deinflect,
             textReplacements: options.textReplacements,
+        });
+        debugYomitanCore('index', 'parseText:complete', {
+            parseLineCount: parsedLines.length,
+            segmentCount: parsedLines.reduce((count, line) => count + line.length, 0),
+            lineSegmentCounts: parsedLines.map((line) => line.length),
+            selectableSegmentCount: parsedLines.reduce(
+                (count, line) => count + line.filter((segment) => Array.isArray(segment.headwords)).length,
+                0,
+            ),
         });
 
         return [
