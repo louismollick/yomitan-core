@@ -1,4 +1,5 @@
 import { distributeFurigana } from '../language/ja/furigana';
+import { addScopeToCssLegacy } from '../render/css-util';
 import type * as Dictionary from '../types/dictionary';
 import type * as DictionaryData from '../types/dictionary-data';
 import {
@@ -795,7 +796,7 @@ function getTermDictionaryAliases(dictionaryEntry: Dictionary.TermDictionaryEntr
 function getTermDictionaryEntryCommonInfo(
     dictionaryEntry: Dictionary.TermDictionaryEntry,
     type: TermDictionaryEntryType,
-    _dictionaryStylesMap: Map<string, string>,
+    dictionaryStylesMap: Map<string, string>,
     _glossaryLayoutMode: GlossaryLayoutMode,
 ): { uniqueTerms: string[]; uniqueReadings: string[]; definitionTags: Tag[]; definitions?: TermDefinition[] } {
     const merged = type === 'termMerged';
@@ -820,6 +821,13 @@ function getTermDictionaryEntryCommonInfo(
         dictionaryAlias,
         sequences,
     } of dictionaryEntry.definitions) {
+        const dictionaryStyles = dictionaryStylesMap.get(dictionary);
+        let glossaryScopedStyles = '';
+        let dictScopedStyles = '';
+        if (dictionaryStyles) {
+            glossaryScopedStyles = addGlossaryScopeToCss(dictionaryStyles);
+            dictScopedStyles = addGlossaryScopeToCss(addDictionaryScopeToCss(dictionaryStyles, dictionary));
+        }
         const definitionTags2: Tag[] = [];
         for (const tag of tags) {
             definitionTags.push(convertTag(tag));
@@ -835,8 +843,8 @@ function getTermDictionaryEntryCommonInfo(
             sequence: sequences[0],
             dictionary,
             dictionaryAlias,
-            glossaryScopedStyles: '',
-            dictScopedStyles: '',
+            glossaryScopedStyles,
+            dictScopedStyles,
             glossary: entries,
             definitionTags: definitionTags2,
             only,
@@ -1101,14 +1109,32 @@ function getTermGlossaryArray(
 function getTermStyles(
     dictionaryEntry: Dictionary.TermDictionaryEntry,
     type: TermDictionaryEntryType,
-    _dictionaryStylesMap: Map<string, string>,
+    dictionaryStylesMap: Map<string, string>,
 ): { glossaryScopedStyles: string; dictScopedStyles: string } | undefined {
     if (type !== 'term') {
         return undefined;
     }
-    // In the library version, CSS scoping is simplified since we don't have
-    // the full CSS manipulation utilities. Consumers can post-process styles.
-    return { glossaryScopedStyles: '', dictScopedStyles: '' };
+    let glossaryScopedStyles = '';
+    let dictScopedStyles = '';
+    for (const { dictionary } of dictionaryEntry.definitions) {
+        const dictionaryStyles = dictionaryStylesMap.get(dictionary);
+        if (dictionaryStyles) {
+            glossaryScopedStyles += addGlossaryScopeToCss(dictionaryStyles);
+            dictScopedStyles += addGlossaryScopeToCss(addDictionaryScopeToCss(dictionaryStyles, dictionary));
+        }
+    }
+    return { glossaryScopedStyles, dictScopedStyles };
+}
+
+function addGlossaryScopeToCss(css: string): string {
+    return addScopeToCssLegacy(css, '.yomitan-glossary');
+}
+
+function addDictionaryScopeToCss(css: string, dictionaryTitle: string): string {
+    const escapedTitle = dictionaryTitle
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
+    return addScopeToCssLegacy(css, `[data-dictionary="${escapedTitle}"]`);
 }
 
 function getTermTags(

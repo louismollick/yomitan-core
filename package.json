@@ -76,6 +76,7 @@
         "@zip.js/zip.js": "^2.7.54",
         "ajv": "^8.17.1",
         "dexie": "^4.0.10",
+        "handlebars": "^4.7.8",
         "yomitan-handlebars": "git+https://github.com/yomidevs/yomitan-handlebars.git#12aff5e3550954d7d3a98a5917ff7d579f3cce25"
     },
     "optionalDependencies": {

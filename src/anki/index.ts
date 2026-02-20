@@ -56,6 +56,19 @@ export type {
     KanjiFrequencyEntry,
 } from './anki-note-data-creator';
 export { AnkiTemplateRenderer } from './anki-template-renderer';
+export {
+    createDefaultAnkiTemplateRenderer,
+    getDefaultAnkiFieldTemplates,
+    buildAnkiNoteFromDictionaryEntry,
+} from './anki-note-service';
+export type { BuildAnkiNoteFromDictionaryEntryInput } from './anki-note-service';
+export {
+    getStandardFieldMarkers,
+    getDynamicFieldMarkers,
+    getDynamicTemplates,
+    getKebabCase,
+} from './anki-template-util';
+export type { DictionaryMarkerSource } from './anki-template-util';
 export type {
     HandlebarsInstance,
     HelperOptions,
@@ -67,3 +80,4 @@ export type {
     RenderMultiItem as TemplateRenderMultiItem,
     RenderMultiResponse as TemplateRenderMultiResponse,
 } from './anki-template-renderer';
+export { DEFAULT_ANKI_FIELD_TEMPLATES } from './default-anki-field-templates';

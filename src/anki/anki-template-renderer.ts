@@ -1,7 +1,10 @@
 import { distributeFurigana } from '../language/ja/furigana';
+import { NoOpContentManager } from '../render/content-manager';
+import { StructuredContentGenerator } from '../render/structured-content-generator';
 import type { SafeAny, SerializableObject, TypeofResult } from '../types/core';
 import type * as Dictionary from '../types/dictionary';
 import type * as DictionaryData from '../types/dictionary-data';
+import type * as StructuredContent from '../types/structured-content';
 import { getPronunciationsOfType, isNonNounVerbOrAdjective } from '../util/dictionary-data-util';
 import type { CommonData, Media, Requirement, TextFuriganaReadingMode } from './anki-note-builder';
 import { createAnkiNoteData } from './anki-note-data-creator';
@@ -394,6 +397,7 @@ export class AnkiTemplateRenderer {
     private _stateStack: Map<string, unknown>[] | null;
     private _requirements: Requirement[] | null;
     private _cleanupCallbacks: (() => void)[];
+    private _document: Document | null;
     private _handlebars: HandlebarsInstance;
 
     constructor(handlebars: HandlebarsInstance) {
@@ -403,6 +407,7 @@ export class AnkiTemplateRenderer {
         this._stateStack = null;
         this._requirements = null;
         this._cleanupCallbacks = [];
+        this._document = typeof document !== 'undefined' ? document : null;
     }
 
     /**
@@ -439,6 +444,7 @@ export class AnkiTemplateRenderer {
             ['concat', this._concat.bind(this)],
             ['pitchCategories', this._pitchCategories.bind(this)],
             ['formatGlossary', this._formatGlossary.bind(this)],
+            ['formatGlossaryPlain', this._formatGlossaryPlain.bind(this)],
             ['hasMedia', this._hasMedia.bind(this)],
             ['getMedia', this._getMedia.bind(this)],
             ['hiragana', this._hiragana.bind(this)],
@@ -914,9 +920,116 @@ export class AnkiTemplateRenderer {
             case 'image':
                 return '';
             case 'structured-content':
-                return this._safeString('[structured content]');
+                return this._safeString(this._formatStructuredContent(content, _dictionary));
         }
         return '';
+    }
+
+    private _formatGlossaryPlain(args: unknown[]): unknown {
+        const [_dictionary, content] = args as [string, DictionaryData.TermGlossaryContent];
+        if (typeof content === 'string') {
+            return this._safeString(content);
+        }
+        if (!(typeof content === 'object' && content !== null)) {
+            return '';
+        }
+        switch (content.type) {
+            case 'text':
+                return this._safeString(content.text);
+            case 'image':
+                return '';
+            case 'structured-content':
+                return this._safeString(this._extractStructuredContentText(content.content));
+        }
+        return '';
+    }
+
+    private _formatStructuredContent(
+        content: DictionaryData.TermGlossaryStructuredContent,
+        dictionary: string,
+    ): string {
+        const node = this._createStructuredContentNode(content.content, dictionary);
+        if (node === null) {
+            return this._stringToMultiLineHtml(this._extractStructuredContentText(content.content));
+        }
+        return this._getNodeHtml(node);
+    }
+
+    private _createStructuredContentNode(content: StructuredContent.Content, dictionary: string): HTMLElement | null {
+        if (this._document === null) {
+            return null;
+        }
+        const generator = new StructuredContentGenerator(new NoOpContentManager(), this._document);
+        return generator.createStructuredContent(content, dictionary);
+    }
+
+    private _getNodeHtml(node: HTMLElement): string {
+        if (this._document === null) {
+            return '';
+        }
+        const container = this._document.createElement('div');
+        container.appendChild(node);
+        return container.innerHTML;
+    }
+
+    private _extractStructuredContentText(content: StructuredContent.Content): string {
+        const text = this._extractStructuredContentTextParts(content).join('');
+        return text
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .trim();
+    }
+
+    private _extractStructuredContentTextParts(content: StructuredContent.Content): string[] {
+        if (typeof content === 'string') {
+            return [content];
+        }
+        if (Array.isArray(content)) {
+            const parts: string[] = [];
+            for (const item of content) {
+                parts.push(...this._extractStructuredContentTextParts(item));
+            }
+            return parts;
+        }
+        if (!(typeof content === 'object' && content !== null)) {
+            return [];
+        }
+
+        if (content.tag === 'br') {
+            return ['\n'];
+        }
+
+        // Hide ruby annotations in plain fallback output and keep base text.
+        if (content.tag === 'rt' || content.tag === 'rp') {
+            return [];
+        }
+
+        const inner =
+            typeof content.content !== 'undefined'
+                ? this._extractStructuredContentTextParts(content.content as StructuredContent.Content)
+                : [];
+
+        switch (content.tag) {
+            case 'li':
+                return [...inner, '\n'];
+            case 'td':
+            case 'th':
+                return [...inner, ' '];
+            case 'div':
+            case 'ol':
+            case 'ul':
+            case 'table':
+            case 'thead':
+            case 'tbody':
+            case 'tfoot':
+            case 'tr':
+            case 'details':
+            case 'summary':
+                return [...inner, '\n'];
+            default:
+                return inner;
+        }
     }
 
     private _hasMedia(args: unknown[], _context: unknown, options: HelperOptions): boolean {
