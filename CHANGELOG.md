@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/louismollick/yomitan-core/compare/v1.2.0...v1.3.0) (2026-02-20)
+
+
+### Features
+
+* anki field and template rendering ([083b698](https://github.com/louismollick/yomitan-core/commit/083b6983ae067fb469afb9d1187b7466ad9796b3))
+
 # [1.2.0](https://github.com/louismollick/yomitan-core/compare/v1.1.0...v1.2.0) (2026-02-18)
 
 
