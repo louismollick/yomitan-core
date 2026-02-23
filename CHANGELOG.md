@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/louismollick/yomitan-core/compare/v1.3.0...v1.4.0) (2026-02-23)
+
+
+### Features
+
+* remove slots in favor of rendering separate nodes per dict result ([c68bba9](https://github.com/louismollick/yomitan-core/commit/c68bba9bf2515a3ce582fa7cc8adf19752b7ba68))
+
 # [1.3.0](https://github.com/louismollick/yomitan-core/compare/v1.2.0...v1.3.0) (2026-02-20)
 
 
