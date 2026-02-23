@@ -56,3 +56,12 @@ export type {
     ResolvedPopupThemeInfo,
     ResolvedTheme,
 } from './popup-theme.js';
+
+// Term entry renderer
+export { createTermEntryRenderer } from './term-entry-renderer.js';
+export type {
+    RenderHostOptions,
+    RenderedTermEntry,
+    TermEntryRenderer,
+    TermEntryRendererCreateOptions,
+} from './term-entry-renderer.js';
