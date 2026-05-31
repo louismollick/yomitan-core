@@ -58,9 +58,12 @@ export type {
 } from './popup-theme.js';
 
 // Term entry renderer
-export { createTermEntryRenderer } from './term-entry-renderer.js';
+export { createKanjiEntryRenderer, createTermEntryRenderer } from './term-entry-renderer.js';
 export type {
+    KanjiEntryRenderer,
+    KanjiEntryRendererCreateOptions,
     RenderHostOptions,
+    RenderedKanjiEntry,
     RenderedTermEntry,
     TermEntryRenderer,
     TermEntryRendererCreateOptions,

@@ -1,8 +1,14 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 
-import { DISPLAY_TEMPLATES, DisplayGenerator, NoOpContentManager, createTermEntryRenderer } from '../src/render';
-import type { Tag, TermDictionaryEntry } from '../src/types/dictionary';
+import {
+    DISPLAY_TEMPLATES,
+    DisplayGenerator,
+    NoOpContentManager,
+    createKanjiEntryRenderer,
+    createTermEntryRenderer,
+} from '../src/render';
+import type { KanjiDictionaryEntry, Tag, TermDictionaryEntry } from '../src/types/dictionary';
 import type { Summary } from '../src/types/dictionary-importer';
 
 function createTag(name: string, category = 'partOfSpeech'): Tag {
@@ -82,6 +88,27 @@ function createDictionaryInfo(styles = ''): Summary[] {
             styles,
         },
     ];
+}
+
+function createKanjiEntry(): KanjiDictionaryEntry {
+    return {
+        type: 'kanji',
+        character: '会',
+        dictionary: 'KANJIDIC',
+        dictionaryIndex: 0,
+        dictionaryAlias: 'KANJIDIC',
+        onyomi: ['カイ'],
+        kunyomi: ['あ.う'],
+        tags: [createTag('joyo', 'class')],
+        stats: {
+            misc: [],
+            class: [],
+            code: [],
+            index: [],
+        },
+        definitions: ['meeting', 'meet'],
+        frequencies: [],
+    };
 }
 
 describe('createTermEntryRenderer', () => {
@@ -181,6 +208,55 @@ describe('createTermEntryRenderer', () => {
 
         const directGenerator = new DisplayGenerator(window.document, new NoOpContentManager(), DISPLAY_TEMPLATES);
         const directNode = directGenerator.createTermEntry(createTermEntry(), dictionaryInfo);
+
+        expect(renderedEntries).toHaveLength(1);
+        expect(renderedEntries[0].entryNode.outerHTML).toBe(directNode.outerHTML);
+    });
+
+    it('adds stable character payloads to headword kanji links', () => {
+        const { window } = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
+            url: 'https://example.com',
+        });
+        const entry = createTermEntry();
+        const directGenerator = new DisplayGenerator(window.document, new NoOpContentManager(), DISPLAY_TEMPLATES);
+        const directNode = directGenerator.createTermEntry(entry, createDictionaryInfo());
+        const kanjiLinks = [...directNode.querySelectorAll('.headword-kanji-link')];
+
+        expect(kanjiLinks.map((node) => (node as HTMLElement).dataset.character)).toEqual(['会']);
+    });
+});
+
+describe('createKanjiEntryRenderer', () => {
+    it('renders kanji entries with the same host styling behavior', () => {
+        const { window } = new JSDOM('<!doctype html><html><head></head><body><div id="host"></div></body></html>', {
+            url: 'https://example.com',
+        });
+        const host = window.document.getElementById('host') as HTMLDivElement;
+        const renderer = createKanjiEntryRenderer({ document: window.document, theme: 'dark', language: 'ja' });
+
+        renderer.prepareHost(host);
+        const renderedEntries = renderer.renderKanjiEntries([createKanjiEntry()], createDictionaryInfo());
+
+        expect(host.classList.contains('yomitan-popup-root')).toBe(true);
+        expect(host.dataset.theme).toBe('dark');
+        expect(host.dataset.language).toBe('ja');
+        expect(renderedEntries).toHaveLength(1);
+    });
+
+    it('keeps kanji entry parity with DisplayGenerator', () => {
+        const { window } = new JSDOM('<!doctype html><html><head></head><body><div id="host"></div></body></html>', {
+            url: 'https://example.com',
+        });
+        const host = window.document.getElementById('host') as HTMLDivElement;
+        const dictionaryInfo = createDictionaryInfo();
+        const entry = createKanjiEntry();
+
+        const renderer = createKanjiEntryRenderer({ document: window.document });
+        renderer.prepareHost(host);
+        const renderedEntries = renderer.renderKanjiEntries([entry], dictionaryInfo);
+
+        const directGenerator = new DisplayGenerator(window.document, new NoOpContentManager(), DISPLAY_TEMPLATES);
+        const directNode = directGenerator.createKanjiEntry(entry, dictionaryInfo);
 
         expect(renderedEntries).toHaveLength(1);
         expect(renderedEntries[0].entryNode.outerHTML).toBe(directNode.outerHTML);
