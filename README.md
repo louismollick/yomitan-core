@@ -156,6 +156,9 @@ const anki = await core.createAnkiClient({ server: 'http://127.0.0.1:8765' });
 const { DisplayGenerator, StructuredContentGenerator, PronunciationGenerator } =
     await core.createRenderer();
 
+// Popup-style render helpers
+import { createTermEntryRenderer, createKanjiEntryRenderer } from 'yomitan-core/render';
+
 // Standalone audio URL generator
 const audioGen = await core.createAudioUrlGenerator();
 ```

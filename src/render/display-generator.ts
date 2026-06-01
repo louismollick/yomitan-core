@@ -540,6 +540,7 @@ export class DisplayGenerator {
     private _createKanjiLink(character: string): HTMLAnchorElement {
         const node = this._document.createElement('a');
         node.className = 'headword-kanji-link';
+        node.dataset.character = character;
         this._setTextContent(node, character, this._language);
         return node;
     }
