@@ -376,6 +376,19 @@ This repo uses semantic-release on pushes to `main`/`master` to:
 - publish to npm
 - create a GitHub release and tag
 
+Pushes to any other branch also publish npm prereleases for testing:
+
+- branches without an open PR publish under `branch-<branch-name>`
+- branches with an open PR publish under `pr-<number>`
+- each publish gets a unique prerelease version suffix, so installs are immutable
+
+Examples:
+
+```bash
+npm install yomitan-core@branch-my-feature
+npm install yomitan-core@pr-123
+```
+
 This workflow uses npm trusted publishing via OIDC (no `NPM_TOKEN` secret).
 Configure a trusted publisher for this GitHub repository in npm settings.
 
