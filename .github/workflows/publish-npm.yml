@@ -3,18 +3,77 @@ name: Publish to npm
 on:
   push:
     branches:
-      - main
-      - master
+      - '**'
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 jobs:
-  publish:
+  publish-prerelease:
+    if: github.ref_name != 'main' && github.ref_name != 'master'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve prerelease metadata
+        id: prerelease
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const slug = branch
+              .toLowerCase()
+              .replace(/[^a-z0-9-]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 48) || 'branch';
+
+            const {data: pulls} = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`,
+              per_page: 1,
+            });
+
+            const pr = pulls[0];
+            const distTag = pr ? `pr-${pr.number}` : `branch-${slug}`;
+            const prereleaseId = pr ? `pr.${pr.number}` : `branch.${slug}`;
+
+            core.setOutput('dist_tag', distTag);
+            core.setOutput('prerelease_id', prereleaseId);
+
+      - name: Set prerelease version
+        run: |
+          base_version="$(node -p "require('./package.json').version")"
+          prerelease_version="${base_version}-${{ steps.prerelease.outputs.prerelease_id }}.${{ github.run_id }}.${{ github.run_attempt }}"
+          npm version "$prerelease_version" --no-git-tag-version
+
+      - name: Publish prerelease
+        run: npm publish --tag "${{ steps.prerelease.outputs.dist_tag }}"
+
+  publish:
+    if: github.ref_name == 'main' || github.ref_name == 'master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
