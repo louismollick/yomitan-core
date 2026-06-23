@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
     AnkiConnect,
     buildAnkiNoteFromDictionaryEntry,
+    buildAnkiNoteFromTerm,
     getDefaultAnkiFieldTemplates,
     getDynamicFieldMarkers,
     getDynamicTemplates,
     getStandardFieldMarkers,
 } from '../src/anki';
+import YomitanCore from '../src/index';
 import type { Tag, TermDictionaryEntry } from '../src/types/dictionary';
 import type { Summary } from '../src/types/dictionary-importer';
 
@@ -283,6 +285,120 @@ describe('anki integration helpers', () => {
         expect(template).toContain('single-glossary-jitendexorg-2026-02-05');
         expect(template).toContain("selectedDictionary='Jitendex.org [2026-02-05]'");
         expect(template).toContain('{{~> (lookup . "marker") ~}}');
+    });
+
+    it('returns no-entry without throwing when term lookup is empty', async () => {
+        const result = await buildAnkiNoteFromTerm({
+            entries: [],
+            cardFormat: {
+                deck: 'Default',
+                model: 'Basic',
+                fields: {
+                    Front: { value: '{expression}' },
+                },
+            },
+            context: {
+                url: 'https://reader.local',
+                query: '不存在',
+                fullQuery: '不存在',
+                documentTitle: 'Reader',
+            },
+        });
+
+        expect(result).toEqual({ status: 'no-entry', errors: [] });
+    });
+
+    it('builds note fields from the first ranked entry', async () => {
+        const core = new YomitanCore();
+        const secondaryEntry = createTermEntry();
+        secondaryEntry.headwords[0].term = '会わす';
+        secondaryEntry.headwords[0].reading = 'あわす';
+        secondaryEntry.definitions[0].entries = ['secondary'];
+
+        const coreLike = core as unknown as {
+            findTerms: typeof core.findTerms;
+        };
+        coreLike.findTerms = async () => ({
+            entries: [createTermEntry(), secondaryEntry],
+            originalTextLength: 3,
+        });
+
+        const result = await core.buildAnkiNoteFromTerm({
+            term: '会わせる',
+            enabledDictionaryMap: new Map(),
+            cardFormat: {
+                deck: 'Default',
+                model: 'Basic',
+                fields: {
+                    Front: { value: '{expression}' },
+                    Back: { value: '{reading}' },
+                },
+            },
+            context: {
+                url: 'https://reader.local',
+                query: '会わせる',
+                fullQuery: '会わせる',
+                documentTitle: 'Reader',
+            },
+        });
+
+        expect(result.status).toBe('ok');
+        if (result.status !== 'ok') {
+            throw new Error('expected ok result');
+        }
+        expect(result.fields.Front).toBe('会わせる');
+        expect(result.fields.Back).toBe('あわせる');
+    });
+
+    it('renders dynamic single-glossary markers in generated fields', async () => {
+        const entry = createTermEntry();
+        entry.dictionaryAlias = 'Jitendex.org [2026-02-05]';
+        entry.definitions[0].dictionaryAlias = 'Jitendex.org [2026-02-05]';
+        entry.definitions[0].dictionary = 'Jitendex.org [2026-02-05]';
+        const result = await buildAnkiNoteFromTerm({
+            entries: [entry],
+            dictionaries: [{ name: 'Jitendex.org [2026-02-05]', enabled: true }],
+            dictionaryInfo: [
+                {
+                    title: 'Jitendex.org [2026-02-05]',
+                    revision: '1',
+                    sequenced: true,
+                    version: 3,
+                    importDate: Date.now(),
+                    prefixWildcardsSupported: false,
+                    styles: '',
+                    counts: {
+                        terms: { total: 1 },
+                        termMeta: { freq: 0 },
+                        kanji: { total: 0 },
+                        kanjiMeta: {},
+                        tagMeta: { total: 0 },
+                        media: { total: 0 },
+                    },
+                },
+            ],
+            cardFormat: {
+                deck: 'Default',
+                model: 'Basic',
+                fields: {
+                    Front: {
+                        value: '{single-glossary-jitendexorg-2026-02-05-brief}',
+                    },
+                },
+            },
+            context: {
+                url: 'https://reader.local',
+                query: '会わせる',
+                fullQuery: '会わせる',
+                documentTitle: 'Reader',
+            },
+        });
+
+        expect(result.status).toBe('ok');
+        if (result.status !== 'ok') {
+            throw new Error('expected ok result');
+        }
+        expect(result.fields.Front).toContain('to make');
     });
 
     it('normalizes anki action wrapper responses', async () => {

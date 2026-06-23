@@ -1,4 +1,5 @@
 import type { DictionaryEntry } from '../types/dictionary';
+import type { Summary } from '../types/dictionary-importer';
 import type { AnkiDuplicateScope } from '../types/settings';
 import { AnkiNoteBuilder } from './anki-note-builder';
 import type {
@@ -8,9 +9,11 @@ import type {
     GlossaryLayoutMode,
     ResultOutputMode,
 } from './anki-note-builder';
-import { DEFAULT_ANKI_FIELD_TEMPLATES } from './default-anki-field-templates';
 import { AnkiTemplateRenderer } from './anki-template-renderer';
 import type { HandlebarsInstance } from './anki-template-renderer';
+import type { DictionaryMarkerSource } from './anki-template-util';
+import { getDynamicTemplates } from './anki-template-util';
+import { DEFAULT_ANKI_FIELD_TEMPLATES } from './default-anki-field-templates';
 
 export type BuildAnkiNoteFromDictionaryEntryInput = {
     dictionaryEntry: DictionaryEntry;
@@ -26,13 +29,34 @@ export type BuildAnkiNoteFromDictionaryEntryInput = {
     dictionaryStylesMap?: Map<string, string>;
 };
 
+export type BuildAnkiNoteFromTermResult =
+    | {
+          status: 'ok';
+          fields: Record<string, string>;
+          errors: string[];
+      }
+    | {
+          status: 'no-entry';
+          errors: string[];
+      };
+
+function normalizeHandlebarsInstance(candidate: any): HandlebarsInstance {
+    const handlebars = candidate?.default?.default ?? candidate?.default ?? candidate;
+    if (!handlebars || typeof handlebars.registerHelper !== 'function') {
+        throw new Error('Invalid Handlebars instance');
+    }
+
+    const wrapped = Object.create(handlebars) as HandlebarsInstance;
+    wrapped.compileAST = (template: string) =>
+        typeof handlebars.compile === 'function' ? handlebars.compile(template) : handlebars.compileAST(template);
+    return wrapped;
+}
+
 async function resolveDefaultHandlebars(): Promise<HandlebarsInstance> {
     try {
-        const module = await import('yomitan-handlebars');
-        return (module.default ?? module) as HandlebarsInstance;
+        return normalizeHandlebarsInstance(await import('yomitan-handlebars'));
     } catch {
-        const module = await import('handlebars');
-        return (module.default ?? module) as HandlebarsInstance;
+        return normalizeHandlebarsInstance(await import('handlebars'));
     }
 }
 
@@ -64,8 +88,8 @@ export function getDefaultAnkiFieldTemplates(dynamicTemplates = ''): string {
 }
 
 export async function buildAnkiNoteFromDictionaryEntry(
-  input: BuildAnkiNoteFromDictionaryEntryInput,
-  handlebars?: HandlebarsInstance,
+    input: BuildAnkiNoteFromDictionaryEntryInput,
+    handlebars?: HandlebarsInstance,
 ): Promise<CreateNoteResult> {
     const renderer = await createDefaultAnkiTemplateRenderer(handlebars);
     const templateRenderer = renderer.templateRenderer;
@@ -87,4 +111,36 @@ export async function buildAnkiNoteFromDictionaryEntry(
         compactTags: input.compactTags ?? false,
         dictionaryStylesMap: input.dictionaryStylesMap ?? new Map(),
     });
+}
+
+export async function buildAnkiNoteFromTerm(
+    input: Omit<BuildAnkiNoteFromDictionaryEntryInput, 'dictionaryEntry' | 'template'> & {
+        entries: DictionaryEntry[];
+        dictionaries?: DictionaryMarkerSource[];
+        dictionaryInfo?: Summary[];
+        template?: string;
+    },
+    handlebars?: HandlebarsInstance,
+): Promise<BuildAnkiNoteFromTermResult> {
+    const dictionaryEntry = input.entries[0];
+    if (!dictionaryEntry) {
+        return { status: 'no-entry', errors: [] };
+    }
+
+    const dynamicTemplates =
+        input.dictionaries && input.dictionaryInfo ? getDynamicTemplates(input.dictionaries, input.dictionaryInfo) : '';
+    const result = await buildAnkiNoteFromDictionaryEntry(
+        {
+            ...input,
+            dictionaryEntry,
+            template: input.template ?? getDefaultAnkiFieldTemplates(dynamicTemplates),
+        },
+        handlebars,
+    );
+
+    return {
+        status: 'ok',
+        fields: result.note.fields,
+        errors: result.errors.map((error) => error.message),
+    };
 }

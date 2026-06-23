@@ -1,3 +1,6 @@
+import { buildAnkiNoteFromTerm as buildAnkiNoteFromTermLookup } from './anki/anki-note-service';
+import type { BuildAnkiNoteFromDictionaryEntryInput, BuildAnkiNoteFromTermResult } from './anki/anki-note-service';
+import type { DictionaryMarkerSource } from './anki/anki-template-util';
 // Main entry point for yomitan-core
 import { DictionaryDB } from './database/dictionary-database';
 import type { DictionaryImporterClass } from './import/dictionary-importer';
@@ -55,6 +58,17 @@ export interface DictionaryUpdateInfo {
     hasUpdate: boolean;
     downloadUrl?: string;
 }
+
+export type BuildAnkiNoteFromTermInput = Omit<BuildAnkiNoteFromDictionaryEntryInput, 'dictionaryEntry' | 'template'> & {
+    term: string;
+    enabledDictionaryMap: Translation.TermEnabledDictionaryMap;
+    dictionaries?: DictionaryMarkerSource[];
+    dictionaryInfo?: DictionaryImporterTypes.Summary[];
+    mode?: FindTermsMode;
+    language?: string;
+    options?: Partial<Translation.FindTermsOptions>;
+    template?: string;
+};
 
 export class YomitanCore {
     private _db: DictionaryDB;
@@ -220,6 +234,21 @@ export class YomitanCore {
         };
 
         return await translator.findKanji(text, findOptions);
+    }
+
+    async buildAnkiNoteFromTerm(input: BuildAnkiNoteFromTermInput): Promise<BuildAnkiNoteFromTermResult> {
+        const lookup = await this.findTerms(input.term, {
+            mode: input.mode,
+            language: input.language,
+            enabledDictionaryMap: input.enabledDictionaryMap,
+            options: input.options,
+        });
+
+        return buildAnkiNoteFromTermLookup({
+            ...input,
+            entries: lookup.entries,
+            template: input.template,
+        });
     }
 
     // ---- Additional Features ----

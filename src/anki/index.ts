@@ -60,8 +60,12 @@ export {
     createDefaultAnkiTemplateRenderer,
     getDefaultAnkiFieldTemplates,
     buildAnkiNoteFromDictionaryEntry,
+    buildAnkiNoteFromTerm,
 } from './anki-note-service';
-export type { BuildAnkiNoteFromDictionaryEntryInput } from './anki-note-service';
+export type {
+    BuildAnkiNoteFromDictionaryEntryInput,
+    BuildAnkiNoteFromTermResult,
+} from './anki-note-service';
 export {
     getStandardFieldMarkers,
     getDynamicFieldMarkers,
