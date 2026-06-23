@@ -118,6 +118,7 @@ export async function buildAnkiNoteFromTerm(
         entries: DictionaryEntry[];
         dictionaries?: DictionaryMarkerSource[];
         dictionaryInfo?: Summary[];
+        additionalTemplates?: string;
         template?: string;
     },
     handlebars?: HandlebarsInstance,
@@ -129,11 +130,12 @@ export async function buildAnkiNoteFromTerm(
 
     const dynamicTemplates =
         input.dictionaries && input.dictionaryInfo ? getDynamicTemplates(input.dictionaries, input.dictionaryInfo) : '';
+    const combinedTemplates = `${dynamicTemplates}\n${input.additionalTemplates ?? ''}`.trim();
     const result = await buildAnkiNoteFromDictionaryEntry(
         {
             ...input,
             dictionaryEntry,
-            template: input.template ?? getDefaultAnkiFieldTemplates(dynamicTemplates),
+            template: input.template ?? getDefaultAnkiFieldTemplates(combinedTemplates),
         },
         handlebars,
     );

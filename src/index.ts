@@ -64,6 +64,7 @@ export type BuildAnkiNoteFromTermInput = Omit<BuildAnkiNoteFromDictionaryEntryIn
     enabledDictionaryMap: Translation.TermEnabledDictionaryMap;
     dictionaries?: DictionaryMarkerSource[];
     dictionaryInfo?: DictionaryImporterTypes.Summary[];
+    additionalTemplates?: string;
     mode?: FindTermsMode;
     language?: string;
     options?: Partial<Translation.FindTermsOptions>;
