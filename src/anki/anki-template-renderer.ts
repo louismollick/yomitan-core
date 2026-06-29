@@ -57,6 +57,19 @@ export type RenderMultiResponse = {
     error?: { name?: string; message?: string; stack?: string; data?: unknown };
 };
 
+async function resolveDocument(currentDocument: Document | null): Promise<Document | null> {
+    if (currentDocument !== null) {
+        return currentDocument;
+    }
+
+    try {
+        const { parseHTML } = await import('linkedom');
+        return parseHTML('<!doctype html><html><body></body></html>').document;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Interface for a Handlebars-compatible template engine.
  * Consumers should provide an implementation that wraps their Handlebars instance.
@@ -421,6 +434,7 @@ export class AnkiTemplateRenderer {
      * Prepares the renderer by registering all Handlebars helpers and data types.
      */
     async prepare(): Promise<void> {
+        this._document = await resolveDocument(this._document);
         this._templateRenderer.registerHelpers([
             ['dumpObject', this._dumpObject.bind(this)],
             ['furigana', this._furigana.bind(this)],

@@ -55,6 +55,10 @@ export function addScopeToCss(css: string, scopeSelector: string): string {
  */
 export function addScopeToCssLegacy(css: string, scopeSelector: string): string {
     try {
+        if (typeof CSSStyleSheet === 'undefined') {
+            return addScopeToCssText(css, scopeSelector);
+        }
+
         const stylesheet = new CSSStyleSheet();
         stylesheet.replaceSync(css);
         const newCSSRules: string[] = [];
@@ -76,6 +80,123 @@ export function addScopeToCssLegacy(css: string, scopeSelector: string): string 
             .map((rule) => rule.cssText || '')
             .join('\n');
     } catch (_e) {
-        return addScopeToCss(css, scopeSelector);
+        return addScopeToCssText(css, scopeSelector);
     }
+}
+
+function addScopeToCssText(css: string, scopeSelector: string): string {
+    return parseCssRules(css)
+        .map((rule) => scopeCssRule(rule.selector, rule.body, scopeSelector))
+        .filter((rule) => rule.length > 0)
+        .join('\n');
+}
+
+function scopeCssRule(selectorText: string, body: string, scopeSelector: string): string {
+    const selector = selectorText.trim();
+    if (selector.length === 0) {
+        return '';
+    }
+
+    if (selector.startsWith('@')) {
+        const scopedBody = addScopeToCssText(body, scopeSelector);
+        return scopedBody.length > 0 ? `${selector} {\n${scopedBody}\n}` : '';
+    }
+
+    const selectors = selector.split(',').map((item) => {
+        const trimmed = item.trim();
+        return scopeSelector.length > 0 ? `${scopeSelector} ${trimmed}` : trimmed;
+    });
+    const declarations: string[] = [];
+    const nestedRules: string[] = [];
+    let declarationStart = 0;
+
+    for (const rule of parseCssRules(body)) {
+        declarations.push(body.slice(declarationStart, rule.start).trim());
+        declarationStart = rule.end;
+        const nestedSelectors = rule.selector
+            .split(',')
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+            .map((item) =>
+                selectors
+                    .map((parentSelector) =>
+                        item.includes('&') ? item.replace(/&/g, parentSelector) : `${parentSelector} ${item}`,
+                    )
+                    .join(', '),
+            )
+            .join(', ');
+        nestedRules.push(scopeCssRule(nestedSelectors, rule.body, ''));
+    }
+
+    declarations.push(body.slice(declarationStart).trim());
+    const declarationBlock = declarations.filter((item) => item.length > 0).join('\n');
+    const scopedRules = declarationBlock.length > 0 ? [`${selectors.join(', ')} {\n${declarationBlock}\n}`] : [];
+    scopedRules.push(...nestedRules.filter((item) => item.length > 0));
+    return scopedRules.join('\n');
+}
+
+function parseCssRules(css: string): { selector: string; body: string; start: number; end: number }[] {
+    const rules: { selector: string; body: string; start: number; end: number }[] = [];
+    let i = 0;
+
+    while (i < css.length) {
+        const open = css.indexOf('{', i);
+        if (open < 0) {
+            break;
+        }
+
+        const selectorStart = findSelectorStart(css, open);
+        const close = findMatchingBrace(css, open);
+        if (close < 0) {
+            break;
+        }
+
+        rules.push({
+            selector: css.slice(selectorStart, open).trim(),
+            body: css.slice(open + 1, close).trim(),
+            start: selectorStart,
+            end: close + 1,
+        });
+        i = close + 1;
+    }
+
+    return rules;
+}
+
+function findSelectorStart(css: string, openIndex: number): number {
+    const previousRuleEnd = css.lastIndexOf('}', openIndex);
+    const previousDeclarationEnd = css.lastIndexOf(';', openIndex);
+    return Math.max(previousRuleEnd, previousDeclarationEnd) + 1;
+}
+
+function findMatchingBrace(css: string, openIndex: number): number {
+    let depth = 0;
+    let quote: string | null = null;
+
+    for (let i = openIndex; i < css.length; i += 1) {
+        const char = css[i];
+        const previous = css[i - 1];
+        if (quote !== null) {
+            if (char === quote && previous !== '\\') {
+                quote = null;
+            }
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+        if (char === '{') {
+            depth += 1;
+            continue;
+        }
+        if (char === '}') {
+            depth -= 1;
+            if (depth === 0) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
 }

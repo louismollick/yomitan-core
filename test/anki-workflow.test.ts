@@ -136,8 +136,8 @@ describe('anki integration helpers', () => {
         ];
 
         const markers = getDynamicFieldMarkers(dictionaries, dictionaryInfo);
-        expect(markers).toContain('single-glossary-jpdb-v2');
         expect(markers).toContain('single-frequency-number-jpdb-v2');
+        expect(markers).not.toContain('single-glossary-jpdb-v2');
     });
 
     it('builds an anki note from dictionary entry and marker mappings', async () => {
@@ -282,8 +282,7 @@ describe('anki integration helpers', () => {
         const dynamic = getDynamicTemplates(dictionaries, dictionaryInfo);
         const template = getDefaultAnkiFieldTemplates(dynamic);
 
-        expect(template).toContain('single-glossary-jitendexorg-2026-02-05');
-        expect(template).toContain("selectedDictionary='Jitendex.org [2026-02-05]'");
+        expect(template).toContain('single-frequency-number-jitendexorg-2026-02-05');
         expect(template).toContain('{{~> (lookup . "marker") ~}}');
     });
 
@@ -350,11 +349,12 @@ describe('anki integration helpers', () => {
         expect(result.fields.Back).toBe('あわせる');
     });
 
-    it('renders dynamic single-glossary markers in generated fields', async () => {
-        const entry = createTermEntry();
+    it('renders grouped glossary HTML through buildAnkiNoteFromTerm', async () => {
+        const entry = createStructuredTermEntry();
         entry.dictionaryAlias = 'Jitendex.org [2026-02-05]';
         entry.definitions[0].dictionaryAlias = 'Jitendex.org [2026-02-05]';
         entry.definitions[0].dictionary = 'Jitendex.org [2026-02-05]';
+
         const result = await buildAnkiNoteFromTerm({
             entries: [entry],
             dictionaries: [{ name: 'Jitendex.org [2026-02-05]', enabled: true }],
@@ -366,7 +366,7 @@ describe('anki integration helpers', () => {
                     version: 3,
                     importDate: Date.now(),
                     prefixWildcardsSupported: false,
-                    styles: '',
+                    styles: '.term-glossary-list { color: red; }',
                     counts: {
                         terms: { total: 1 },
                         termMeta: { freq: 0 },
@@ -382,7 +382,7 @@ describe('anki integration helpers', () => {
                 model: 'Basic',
                 fields: {
                     Front: {
-                        value: '{single-glossary-jitendexorg-2026-02-05-brief}',
+                        value: '{glossary}',
                     },
                 },
             },
@@ -392,13 +392,26 @@ describe('anki integration helpers', () => {
                 fullQuery: '会わせる',
                 documentTitle: 'Reader',
             },
+            resultOutputMode: 'group',
+            dictionaryStylesMap: new Map([['Jitendex.org [2026-02-05]', '.term-glossary-list { color: red; }']]),
         });
 
         expect(result.status).toBe('ok');
         if (result.status !== 'ok') {
             throw new Error('expected ok result');
         }
-        expect(result.fields.Front).toContain('to make');
+        expect(result.fields.Front).toContain('<ol>');
+        expect(result.fields.Front).toContain('<li data-dictionary="Jitendex.org [2026-02-05]">');
+        expect(result.fields.Front).toContain('class="structured-content"');
+        expect(result.fields.Front).toContain('class="gloss-sc-div"');
+        expect(result.fields.Front).toContain('<ruby');
+        expect(result.fields.Front).toContain('<style>');
+        expect(result.fields.Front).toContain('[data-dictionary="Jitendex.org [2026-02-05]"]');
+        expect(result.fields.Front).toContain(
+            '.yomitan-glossary [data-dictionary="Jitendex.org [2026-02-05]"] .term-glossary-list',
+        );
+        expect(result.fields.Front).toContain('color: red;');
+        expect(result.fields.Front).not.toContain('.yomitan-glossary {[data-dictionary=');
     });
 
     it('normalizes anki action wrapper responses', async () => {
