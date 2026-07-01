@@ -89,7 +89,14 @@ export class SentenceParser {
         const results: ParseTextLine[] = [];
 
         for (const [lineIndex, line] of lines.entries()) {
-            const segments = await this._parseLine(line, lineIndex, language, enabledDictionaryMap, scanLength, options);
+            const segments = await this._parseLine(
+                line,
+                lineIndex,
+                language,
+                enabledDictionaryMap,
+                scanLength,
+                options,
+            );
             results.push(segments);
         }
 
@@ -187,7 +194,7 @@ export class SentenceParser {
                 if (previousUngroupedSegment === null) {
                     previousUngroupedSegment = {
                         text: character,
-                        reading: ''
+                        reading: '',
                     };
                     result.push(previousUngroupedSegment);
                     unmatchedSegmentCount += 1;

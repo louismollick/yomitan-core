@@ -1,5 +1,6 @@
 import type { LanguageDescriptorAny } from '../types/language';
 import { normalizeRadicalCharacters } from './cjk-util';
+import { isStringPartiallyJapanese } from './ja/japanese';
 import {
     alphabeticToHiragana,
     alphanumericWidthVariants,
@@ -11,7 +12,6 @@ import {
     standardizeKanji,
 } from './ja/japanese-text-preprocessors';
 import { japaneseTransforms } from './ja/japanese-transforms';
-import { isStringPartiallyJapanese } from './ja/japanese';
 import { capitalizeFirstLetter, decapitalize, removeAlphabeticDiacritics } from './text-processors';
 
 const capitalizationPreprocessors = {

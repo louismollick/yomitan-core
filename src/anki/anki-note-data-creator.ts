@@ -1131,9 +1131,7 @@ function addGlossaryScopeToCss(css: string): string {
 }
 
 function addDictionaryScopeToCss(css: string, dictionaryTitle: string): string {
-    const escapedTitle = dictionaryTitle
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"');
+    const escapedTitle = dictionaryTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     return addScopeToCssLegacy(css, `[data-dictionary="${escapedTitle}"]`);
 }
 

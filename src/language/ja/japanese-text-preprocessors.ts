@@ -1,7 +1,7 @@
+import mappings from 'kanji-processor/dist/full_list.json';
+import itaijiList from 'kanji-processor/dist/itaiji_list.json';
 import type { BidirectionalConversionPreprocessor, TextProcessor } from '../../types/language';
 import { basicTextProcessorOptions } from '../text-processors';
-import itaijiList from 'kanji-processor/dist/itaiji_list.json';
-import mappings from 'kanji-processor/dist/full_list.json';
 import {
     collapseEmphaticSequences as collapseEmphaticSequencesFunction,
     convertAlphanumericToFullWidth,

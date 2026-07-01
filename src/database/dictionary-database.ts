@@ -420,7 +420,10 @@ export class DictionaryDB {
 
         const table = this._db.table(objectStoreName);
         const batch = items.slice(start, start + count);
-        await table.bulkPut(batch.map((item) => item.data), batch.map((item) => item.primaryKey));
+        await table.bulkPut(
+            batch.map((item) => item.data),
+            batch.map((item) => item.primaryKey),
+        );
     }
 
     // Private result creators

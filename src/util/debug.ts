@@ -39,8 +39,7 @@ export function debugYomitanCore(scope: string, message: string, details?: Recor
 }
 
 export function codePointPreview(text: string, limit = 48): string[] {
-    return Array.from(text.slice(0, limit)).map((char) =>
-        `U+${char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0')}`,
+    return Array.from(text.slice(0, limit)).map(
+        (char) => `U+${char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0')}`,
     );
 }
-
