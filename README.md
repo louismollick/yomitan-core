@@ -8,6 +8,10 @@ Core dictionary lookup, language processing, and rendering engine extracted from
 npm install yomitan-core
 ```
 
+## Development
+
+After `npm install`, Husky installs a `commit-msg` hook that rejects non-conventional commit messages.
+
 ### Optional dependencies
 
 | Package | Purpose |
