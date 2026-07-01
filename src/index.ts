@@ -2,6 +2,7 @@ import { buildAnkiNoteFromTerm as buildAnkiNoteFromTermLookup } from './anki/ank
 import type { BuildAnkiNoteFromDictionaryEntryInput, BuildAnkiNoteFromTermResult } from './anki/anki-note-service';
 import type { DictionaryMarkerSource } from './anki/anki-template-util';
 // Main entry point for yomitan-core
+import type { DictionaryDatabaseBackend } from './database/backend';
 import { DictionaryDB } from './database/dictionary-database';
 import type { DictionaryImporterClass } from './import/dictionary-importer';
 import { getAllLanguageTextProcessors, getLanguageSummaries, isTextLookupWorthy } from './language/languages';
@@ -28,10 +29,13 @@ export { log } from './util/log';
 // Re-export key classes from submodules
 export { DictionaryDB } from './database/dictionary-database';
 export { YomitanDatabase } from './database/schema';
+export type { DictionaryDatabaseBackend } from './database/backend';
 
 export interface YomitanCoreConfig {
     /** Database name (default: 'dict') */
     databaseName?: string;
+    /** Storage backend override (default: IndexedDB/Dexie DictionaryDB) */
+    storageAdapter?: DictionaryDatabaseBackend;
     /** Whether to automatically initialize language transformers (default: true) */
     initLanguage?: boolean;
 }
@@ -71,21 +75,24 @@ export type BuildAnkiNoteFromTermInput = Omit<BuildAnkiNoteFromDictionaryEntryIn
 };
 
 export class YomitanCore {
-    private _db: DictionaryDB;
+    private _db: DictionaryDatabaseBackend;
     private _multiLanguageTransformer: MultiLanguageTransformer;
     private _translator: TranslatorClass | null = null;
     private _sentenceParser: SentenceParserClass | null = null;
     private _batchProcessor: BatchProcessorClass | null = null;
     private _frequencyRanker: FrequencyRankerClass | null = null;
     private _initialized = false;
-    private _config: Required<YomitanCoreConfig>;
+    private _config: {
+        databaseName: string;
+        initLanguage: boolean;
+    };
 
     constructor(config?: YomitanCoreConfig) {
         this._config = {
             databaseName: config?.databaseName ?? 'dict',
             initLanguage: config?.initLanguage ?? true,
         };
-        this._db = new DictionaryDB(this._config.databaseName);
+        this._db = config?.storageAdapter ?? new DictionaryDB(this._config.databaseName);
         this._multiLanguageTransformer = new MultiLanguageTransformer();
     }
 
@@ -119,7 +126,7 @@ export class YomitanCore {
         return this._initialized;
     }
 
-    get database(): DictionaryDB {
+    get database(): DictionaryDatabaseBackend {
         this._ensureInitialized();
         return this._db;
     }

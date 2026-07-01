@@ -4,6 +4,7 @@ export default defineConfig({
     entry: {
         index: 'src/index.ts',
         database: 'src/database/index.ts',
+        'database/node-sqlite': 'src/database/node-sqlite.ts',
         import: 'src/import/index.ts',
         lookup: 'src/lookup/index.ts',
         language: 'src/language/index.ts',

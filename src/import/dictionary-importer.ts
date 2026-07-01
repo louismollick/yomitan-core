@@ -1,6 +1,6 @@
 import { BlobWriter, TextWriter, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js';
 import type { Entry, WritableWriter, Writer } from '@zip.js/zip.js';
-import type { DictionaryDB } from '../database/dictionary-database';
+import type { DictionaryDatabaseBackend } from '../database/backend';
 import type * as DictionaryData from '../types/dictionary-data';
 import type * as DictionaryDatabase from '../types/dictionary-database';
 import type * as DictionaryImporter from '../types/dictionary-importer';
@@ -28,7 +28,7 @@ export class DictionaryImporterClass {
     }
 
     async importDictionary(
-        dictionaryDatabase: DictionaryDB,
+        dictionaryDatabase: DictionaryDatabaseBackend,
         archiveContent: ArrayBuffer,
         details: DictionaryImporter.ImportDetails,
     ): Promise<DictionaryImporter.ImportResult> {

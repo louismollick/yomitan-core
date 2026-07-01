@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import type { DictionaryDB } from '../database/dictionary-database';
+import type { DictionaryDatabaseBackend } from '../database/backend';
 import type * as DictionaryData from '../types/dictionary-data';
 import type * as DictionaryDatabase from '../types/dictionary-database';
 
@@ -31,10 +31,10 @@ export interface FrequencyRanking {
  * aggregate frequency rankings across multiple dictionaries.
  */
 export class FrequencyRanker {
-    private _db: DictionaryDB;
+    private _db: DictionaryDatabaseBackend;
     private _numberRegex: RegExp;
 
-    constructor(db: DictionaryDB) {
+    constructor(db: DictionaryDatabaseBackend) {
         this._db = db;
         this._numberRegex = /[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?/;
     }

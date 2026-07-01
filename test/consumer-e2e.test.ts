@@ -1,3 +1,6 @@
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -8,6 +11,8 @@ import {
     getDynamicTemplates,
     getStandardFieldMarkers,
 } from '../src/anki';
+import type { DictionaryDatabaseBackend } from '../src/database';
+import { createNodeSqliteDictionaryDB } from '../src/database/node-sqlite';
 import YomitanCore from '../src/index';
 import { createKanjiEntryRenderer, createTermEntryRenderer } from '../src/render';
 import type { Summary } from '../src/types/dictionary-importer';
@@ -34,11 +39,43 @@ type EnabledKanjiDictionary = {
     alias: string;
 };
 
-const activeCores: YomitanCore[] = [];
+type StorageBackend = {
+    name: string;
+    createDbName(name: string): string;
+    createStorageAdapter?(dbName: string): DictionaryDatabaseBackend;
+    cleanup?(dbName: string): Promise<void>;
+};
+
+const storageBackends: StorageBackend[] = [
+    {
+        name: 'indexeddb',
+        createDbName,
+    },
+    {
+        name: 'sqlite',
+        createDbName: (name) => join(tmpdir(), `${createDbName(name)}.sqlite`),
+        createStorageAdapter: (dbName) => createNodeSqliteDictionaryDB({ path: dbName }),
+        cleanup: async (dbName) => {
+            // WAL mode can leave sidecar files behind after close; clean them so backend parametrization
+            // does not leak state between test cases.
+            await Promise.all([
+                rm(dbName, { force: true }),
+                rm(`${dbName}-wal`, { force: true }),
+                rm(`${dbName}-shm`, { force: true }),
+            ]);
+        },
+    },
+];
+
+const activeCores: { core: YomitanCore; storageBackend: StorageBackend; dbName: string }[] = [];
 
 afterEach(async () => {
     while (activeCores.length > 0) {
-        const core = activeCores.pop() as YomitanCore;
+        const { core, storageBackend, dbName } = activeCores.pop() as {
+            core: YomitanCore;
+            storageBackend: StorageBackend;
+            dbName: string;
+        };
         try {
             if (core.isReady) {
                 await core.database.purge();
@@ -51,14 +88,19 @@ afterEach(async () => {
         } catch {
             // Ignore cleanup failures in tests.
         }
+        try {
+            await storageBackend.cleanup?.(dbName);
+        } catch {
+            // Ignore cleanup failures in tests.
+        }
     }
 });
 
-describe('consumer-driven e2e contracts', () => {
+describe.each(storageBackends)('consumer-driven e2e contracts ($name)', (storageBackend) => {
     it('imports multiple consumer-style dictionaries and builds consumer maps', async () => {
         const { consumerTerms, styledTerms, consumerMeta, consumerKanji, consumerKanjiAlt } =
             await getConsumerE2eFixtures();
-        const core = await createCore('consumer-install');
+        const core = await createCore(storageBackend, 'consumer-install');
 
         const firstImportProgress: { index: number; count: number; nextStep?: boolean }[] = [];
         await core.importDictionary(consumerTerms, {
@@ -108,7 +150,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('supports grouped and deinflected term lookup across multiple dictionaries', async () => {
-        const core = await createPopulatedCore('consumer-grouped-lookup');
+        const core = await createPopulatedCore(storageBackend, 'consumer-grouped-lookup');
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
 
@@ -159,7 +201,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('tokenizes text like mokuro-reader using parseText', async () => {
-        const core = await createPopulatedCore('consumer-tokenize');
+        const core = await createPopulatedCore(storageBackend, 'consumer-tokenize');
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
 
@@ -192,7 +234,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('supports kanji lookup and metadata across installed dictionaries', async () => {
-        const core = await createPopulatedCore('consumer-kanji');
+        const core = await createPopulatedCore(storageBackend, 'consumer-kanji');
         const dictionaryInfo = await core.getDictionaryInfo();
         const kanjiDictionaryMap = buildKanjiDictionaryMap(dictionaryInfo);
 
@@ -213,7 +255,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('builds lapis-style anki notes from term lookups and handles no-entry', async () => {
-        const core = await createPopulatedCore('consumer-lapis-note');
+        const core = await createPopulatedCore(storageBackend, 'consumer-lapis-note');
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
         const dictionaryStylesMap = buildDictionaryStylesMap(dictionaryInfo);
@@ -300,7 +342,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('builds popup-style anki notes and dynamic templates from imported dictionaries', async () => {
-        const core = await createPopulatedCore('consumer-popup-note');
+        const core = await createPopulatedCore(storageBackend, 'consumer-popup-note');
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
         const dictionaryStylesMap = buildDictionaryStylesMap(dictionaryInfo);
@@ -397,7 +439,7 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('renders imported entries with styles, media, and stable kanji payloads', async () => {
-        const core = await createPopulatedCore('consumer-render');
+        const core = await createPopulatedCore(storageBackend, 'consumer-render');
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
         const kanjiDictionaryMap = buildKanjiDictionaryMap(dictionaryInfo);
@@ -474,8 +516,8 @@ describe('consumer-driven e2e contracts', () => {
     });
 
     it('deletes one dictionary without breaking remaining lookups and supports reopen', async () => {
-        const dbName = createDbName('consumer-reopen');
-        const core = await createPopulatedCore(dbName, dbName);
+        const dbName = storageBackend.createDbName('consumer-reopen');
+        const core = await createPopulatedCore(storageBackend, dbName, dbName);
         const dictionaryInfo = await core.getDictionaryInfo();
         const termDictionaryMap = buildTermDictionaryMap(dictionaryInfo);
 
@@ -499,7 +541,7 @@ describe('consumer-driven e2e contracts', () => {
 
         await core.dispose();
 
-        const reopened = await createCore(dbName, dbName);
+        const reopened = await createCore(storageBackend, dbName, dbName);
         const reopenedInfo = await reopened.getDictionaryInfo();
         expect(reopenedInfo.map((item) => item.title)).not.toContain(STYLED_TERM_DICTIONARY_TITLE);
         const reopenedLookup = await reopened.findTerms('猫', {
@@ -531,7 +573,7 @@ describe('consumer-driven e2e contracts', () => {
 
     it('exercises importer chunking and reports failed imports honestly', async () => {
         const { chunkedImport, partialFailure, missingIndex } = await getConsumerE2eFixtures();
-        const chunkedCore = await createCore('consumer-chunked');
+        const chunkedCore = await createCore(storageBackend, 'consumer-chunked');
 
         const chunkedResult = await chunkedCore.importDictionary(chunkedImport);
         expect(chunkedResult.errors).toHaveLength(0);
@@ -551,14 +593,14 @@ describe('consumer-driven e2e contracts', () => {
         });
         expect(chunkedLookup.entries[0].headwords[0].term).toBe('単語1000');
 
-        const brokenCore = await createCore('consumer-broken');
+        const brokenCore = await createCore(storageBackend, 'consumer-broken');
         const brokenResult = await brokenCore.importDictionary(partialFailure);
         expect(brokenResult.errors.length).toBeGreaterThan(0);
         expect(brokenResult.result?.importSuccess).toBe(false);
         const brokenInfo = await brokenCore.getDictionaryInfo();
         expect(brokenInfo[0].importSuccess).toBe(false);
 
-        const missingIndexCore = await createCore('consumer-missing-index');
+        const missingIndexCore = await createCore(storageBackend, 'consumer-missing-index');
         await expect(missingIndexCore.importDictionary(missingIndex)).rejects.toThrow('No dictionary index found');
     });
 });
@@ -567,17 +609,28 @@ function createDbName(name: string): string {
     return `consumer-e2e-${name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function createCore(name: string, dbName = createDbName(name)): Promise<YomitanCore> {
-    const core = new YomitanCore({ databaseName: dbName });
-    activeCores.push(core);
+async function createCore(
+    storageBackend: StorageBackend,
+    name: string,
+    dbName = storageBackend.createDbName(name),
+): Promise<YomitanCore> {
+    const core = new YomitanCore({
+        databaseName: dbName,
+        storageAdapter: storageBackend.createStorageAdapter?.(dbName),
+    });
+    activeCores.push({ core, storageBackend, dbName });
     await core.initialize();
     return core;
 }
 
-async function createPopulatedCore(name: string, dbName?: string): Promise<YomitanCore> {
+async function createPopulatedCore(
+    storageBackend: StorageBackend,
+    name: string,
+    dbName?: string,
+): Promise<YomitanCore> {
     const { consumerTerms, styledTerms, consumerMeta, consumerKanji, consumerKanjiAlt } =
         await getConsumerE2eFixtures();
-    const core = await createCore(name, dbName);
+    const core = await createCore(storageBackend, name, dbName);
     await core.importDictionary(consumerTerms);
     await core.importDictionary(styledTerms);
     await core.importDictionary(consumerMeta);

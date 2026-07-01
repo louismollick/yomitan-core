@@ -22,6 +22,11 @@
             "require": "./dist/database.cjs",
             "types": "./dist/database.d.ts"
         },
+        "./database/node-sqlite": {
+            "import": "./dist/database/node-sqlite.js",
+            "require": "./dist/database/node-sqlite.cjs",
+            "types": "./dist/database/node-sqlite.d.ts"
+        },
         "./import": {
             "import": "./dist/import.js",
             "require": "./dist/import.cjs",
@@ -75,6 +80,7 @@
     "dependencies": {
         "@zip.js/zip.js": "^2.7.54",
         "ajv": "^8.17.1",
+        "better-sqlite3": "^11.10.0",
         "dexie": "^4.0.10",
         "handlebars": "^4.7.8",
         "linkedom": "^0.18.10",
@@ -88,6 +94,7 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^1.9.4",
+        "@types/better-sqlite3": "^7.6.13",
         "fake-indexeddb": "^6.0.0",
         "jsdom": "^25.0.1",
         "tsdown": "^0.9.0",

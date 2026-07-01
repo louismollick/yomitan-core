@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import type { DictionaryDB } from '../database/dictionary-database';
+import type { DictionaryDatabaseBackend } from '../database/backend';
 import {
     CJK_IDEOGRAPH_RANGES,
     CJK_PUNCTUATION_RANGE,
@@ -242,7 +242,7 @@ class TranslatorTagAggregator {
  * Class which finds term and kanji dictionary entries for text.
  */
 export class Translator {
-    private _database: DictionaryDB;
+    private _database: DictionaryDatabaseBackend;
     private _multiLanguageTransformer: MultiLanguageTransformer;
     private _tagCache: DictionaryTagCache;
     private _stringComparer: Intl.Collator;
@@ -250,7 +250,7 @@ export class Translator {
     private _textProcessors: TextProcessorMap;
     private _readingNormalizers: ReadingNormalizerMap;
 
-    constructor(database: DictionaryDB) {
+    constructor(database: DictionaryDatabaseBackend) {
         this._database = database;
         this._multiLanguageTransformer = new MultiLanguageTransformer();
         this._tagCache = new Map();

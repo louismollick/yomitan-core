@@ -1,4 +1,4 @@
-import type { DictionaryDB } from '../database/dictionary-database';
+import type { DictionaryDatabaseBackend } from '../database/backend';
 import type { Summary } from '../types/dictionary-importer';
 import { compareRevisions } from '../util/dictionary-data-util';
 
@@ -11,9 +11,9 @@ export interface DictionaryUpdateInfo {
 }
 
 export class DictionaryUpdateChecker {
-    private _db: DictionaryDB;
+    private _db: DictionaryDatabaseBackend;
 
-    constructor(db: DictionaryDB) {
+    constructor(db: DictionaryDatabaseBackend) {
         this._db = db;
     }
 

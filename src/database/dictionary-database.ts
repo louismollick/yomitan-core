@@ -2,9 +2,10 @@ import type * as DictionaryDatabase from '../types/dictionary-database';
 import type * as DictionaryImporter from '../types/dictionary-importer';
 import { log } from '../util/log';
 import { stringReverse } from '../util/utilities';
+import type { DictionaryDatabaseBackend } from './backend';
 import { OBJECT_STORE_NAMES, YomitanDatabase } from './schema';
 
-export class DictionaryDB {
+export class DictionaryDB implements DictionaryDatabaseBackend {
     private _db: YomitanDatabase;
     private _isOpen: boolean;
 
