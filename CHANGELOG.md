@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/louismollick/yomitan-core/compare/v1.5.0...v1.6.0) (2026-07-01)
+
+
+### Features
+
+* trigger version ([d9c5b05](https://github.com/louismollick/yomitan-core/commit/d9c5b05427fe0731861d55279c2bf3fe7286484f))
+
 # [1.5.0](https://github.com/louismollick/yomitan-core/compare/v1.4.0...v1.5.0) (2026-06-01)
 
 
