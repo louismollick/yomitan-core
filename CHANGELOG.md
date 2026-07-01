@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/louismollick/yomitan-core/compare/v1.6.0...v1.7.0) (2026-07-01)
+
+
+### Features
+
+* sqlite adapter ([af19a68](https://github.com/louismollick/yomitan-core/commit/af19a684325e5865d11fe8d759d5e6fe36e9db04))
+
 # [1.6.0](https://github.com/louismollick/yomitan-core/compare/v1.5.0...v1.6.0) (2026-07-01)
 
 
