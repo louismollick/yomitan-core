@@ -77,20 +77,14 @@
         "ajv": "^8.17.1",
         "dexie": "^4.0.10",
         "handlebars": "^4.7.8",
+        "linkedom": "^0.18.10",
+        "postcss": "^8.5.16",
         "yomitan-handlebars": "git+https://github.com/yomidevs/yomitan-handlebars.git#12aff5e3550954d7d3a98a5917ff7d579f3cce25"
     },
     "optionalDependencies": {
         "@resvg/resvg-wasm": "^2.6.2",
         "hangul-js": "^0.2.6",
         "kanji-processor": "^1.0.2"
-    },
-    "peerDependencies": {
-        "linkedom": "^0.18.10"
-    },
-    "peerDependenciesMeta": {
-        "linkedom": {
-            "optional": true
-        }
     },
     "devDependencies": {
         "@biomejs/biome": "^1.9.4",

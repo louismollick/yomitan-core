@@ -101,10 +101,7 @@ export function getStandardFieldMarkers(type: DictionaryEntryType, language = 'j
 /**
  * Returns dynamic marker names derived from enabled dictionaries.
  */
-export function getDynamicFieldMarkers(
-    dictionaries: DictionaryMarkerSource[],
-    dictionaryInfo: Summary[],
-): string[] {
+export function getDynamicFieldMarkers(dictionaries: DictionaryMarkerSource[], dictionaryInfo: Summary[]): string[] {
     const markers: string[] = [];
     for (const dictionary of dictionaries) {
         const currentDictionaryInfo = dictionaryInfo.find(({ title }) => title === dictionary.name);
@@ -112,13 +109,8 @@ export function getDynamicFieldMarkers(
             continue;
         }
 
-        const totalTerms = currentDictionaryInfo?.counts?.terms?.total;
-        if (totalTerms && totalTerms > 0) {
-            markers.push(`single-glossary-${getKebabCase(dictionary.name)}`);
-        }
-
         const totalMeta = currentDictionaryInfo?.counts?.termMeta;
-        if (totalMeta && totalMeta.freq && totalMeta.freq > 0) {
+        if (totalMeta?.freq && totalMeta.freq > 0) {
             markers.push(`single-frequency-number-${getKebabCase(dictionary.name)}`);
         }
     }
@@ -128,10 +120,7 @@ export function getDynamicFieldMarkers(
 /**
  * Returns dynamic inline template partials derived from enabled dictionaries.
  */
-export function getDynamicTemplates(
-    dictionaries: DictionaryMarkerSource[],
-    dictionaryInfo: Summary[],
-): string {
+export function getDynamicTemplates(dictionaries: DictionaryMarkerSource[], dictionaryInfo: Summary[]): string {
     let dynamicTemplates = '\n';
     for (const dictionary of dictionaries) {
         const currentDictionaryInfo = dictionaryInfo.find(({ title }) => title === dictionary.name);
@@ -139,33 +128,8 @@ export function getDynamicTemplates(
             continue;
         }
 
-        const totalTerms = currentDictionaryInfo?.counts?.terms?.total;
-        if (totalTerms && totalTerms > 0) {
-            dynamicTemplates += `
-{{#*inline "single-glossary-${getKebabCase(dictionary.name)}"}}
-    {{~> glossary selectedDictionary='${escapeDictName(dictionary.name)}'}}
-{{/inline}}
-
-{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-no-dictionary"}}
-    {{~> glossary selectedDictionary='${escapeDictName(dictionary.name)}' noDictionaryTag=true}}
-{{/inline}}
-
-{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-brief"}}
-    {{~> glossary selectedDictionary='${escapeDictName(dictionary.name)}' brief=true}}
-{{/inline}}
-
-{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-plain"}}
-    {{~> glossary-plain selectedDictionary='${escapeDictName(dictionary.name)}'}}
-{{/inline}}
-
-{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-plain-no-dictionary"}}
-    {{~> glossary-plain-no-dictionary selectedDictionary='${escapeDictName(dictionary.name)}' noDictionaryTag=true}}
-{{/inline}}
-`;
-        }
-
         const totalMeta = currentDictionaryInfo?.counts?.termMeta;
-        if (totalMeta && totalMeta.freq && totalMeta.freq > 0) {
+        if (totalMeta?.freq && totalMeta.freq > 0) {
             dynamicTemplates += `
 {{#*inline "single-frequency-number-${getKebabCase(dictionary.name)}"}}
     {{~> single-frequency-number selectedDictionary='${escapeDictName(dictionary.name)}'}}
@@ -189,7 +153,5 @@ export function getKebabCase(str: string): string {
 }
 
 function escapeDictName(name: string): string {
-    return name
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'");
+    return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }

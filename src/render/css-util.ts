@@ -1,3 +1,5 @@
+import postcss, { list, type Container, type Rule } from 'postcss';
+
 /*
  * Copyright (C) 2023-2025  Yomitan Authors
  *
@@ -55,6 +57,10 @@ export function addScopeToCss(css: string, scopeSelector: string): string {
  */
 export function addScopeToCssLegacy(css: string, scopeSelector: string): string {
     try {
+        if (typeof CSSStyleSheet === 'undefined') {
+            return addScopeToCssText(css, scopeSelector);
+        }
+
         const stylesheet = new CSSStyleSheet();
         stylesheet.replaceSync(css);
         const newCSSRules: string[] = [];
@@ -76,6 +82,39 @@ export function addScopeToCssLegacy(css: string, scopeSelector: string): string 
             .map((rule) => rule.cssText || '')
             .join('\n');
     } catch (_e) {
+        return addScopeToCssText(css, scopeSelector);
+    }
+}
+
+function addScopeToCssText(css: string, scopeSelector: string): string {
+    try {
+        const root = postcss.parse(css);
+        scopeCssContainer(root, scopeSelector);
+        return root.toString();
+    } catch (_e) {
         return addScopeToCss(css, scopeSelector);
     }
+}
+
+function scopeCssContainer(container: Container, scopeSelector: string): void {
+    container.walkRules((rule) => {
+        if (isKeyframesRule(rule)) {
+            return;
+        }
+        rule.selector = list
+            .comma(rule.selector)
+            .map((selector) => `${scopeSelector} ${selector.trim()}`)
+            .join(', ');
+    });
+}
+
+function isKeyframesRule(rule: Rule): boolean {
+    let parent = rule.parent as { type: string; name?: string; parent?: unknown } | undefined;
+    while (parent) {
+        if (parent.type === 'atrule' && parent.name?.toLowerCase().endsWith('keyframes')) {
+            return true;
+        }
+        parent = parent.parent as { type: string; name?: string; parent?: unknown } | undefined;
+    }
+    return false;
 }
