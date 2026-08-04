@@ -1,5 +1,15 @@
 # Migrating to the v2 client
 
+The repository is now an npm workspace. Package responsibilities are split behind these unpublished v2 entry points:
+
+- `yomitan-core`: engine and serializable client API;
+- `@yomitan-core/web`: browser compatibility facade;
+- `@yomitan-core/node`: Node SQLite compatibility facade;
+- `@yomitan-core/react-native`: lazy, side-effect-free mobile facade;
+- `@yomitan-core/web-renderer`: DOM renderer compatibility facade.
+
+The platform packages remain private until their implementations no longer depend on compatibility exports from the core package. Continue using the published v1 line in external consumers until a v2 prerelease is available.
+
 The v1 `YomitanCore` class and subpath exports remain available during the v2
 migration. New integrations should use `createYomitan` and inject storage.
 

@@ -1,0 +1,35 @@
+{
+    "name": "@yomitan-core/web",
+    "version": "2.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        },
+        "./render": {
+            "types": "./dist/render.d.ts",
+            "import": "./dist/render.js",
+            "require": "./dist/render.cjs"
+        },
+        "./anki": {
+            "types": "./dist/anki.d.ts",
+            "import": "./dist/anki.js",
+            "require": "./dist/anki.cjs"
+        }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": ["dist", "README.md", "LICENSE"],
+    "scripts": {
+        "build": "tsdown",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@yomitan-core/web-renderer": "2.0.0",
+        "yomitan-core": "2.0.0"
+    }
+}

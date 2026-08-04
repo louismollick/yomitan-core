@@ -9,13 +9,14 @@
     [
       "@semantic-release/changelog",
       {
-        "changelogFile": "CHANGELOG.md"
+        "changelogFile": "packages/core/CHANGELOG.md"
       }
     ],
     [
       "@semantic-release/npm",
       {
-        "npmPublish": true
+        "npmPublish": true,
+        "pkgRoot": "packages/core"
       }
     ],
     "@semantic-release/github",
@@ -23,9 +24,9 @@
       "@semantic-release/git",
       {
         "assets": [
-          "package.json",
+          "packages/core/package.json",
           "package-lock.json",
-          "CHANGELOG.md"
+          "packages/core/CHANGELOG.md"
         ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }

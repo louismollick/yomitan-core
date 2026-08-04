@@ -1,0 +1,27 @@
+{
+    "name": "@yomitan-core/react-native",
+    "version": "2.0.0",
+    "private": true,
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "react-native": "./dist/index.js",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "react-native": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": ["dist", "README.md", "LICENSE"],
+    "scripts": {
+        "build": "tsdown",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "yomitan-core": "2.0.0"
+    }
+}
