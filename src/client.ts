@@ -3,6 +3,7 @@ import type { DictionaryUpdateInfo, FrequencyRankingResult, TermLookupResult, Yo
 import type { FindTermsMode } from './lookup/translator';
 import type { KanjiDictionaryEntry, TermDictionaryEntry } from './types/dictionary';
 import type { ImportResult, OnProgressCallback, Summary } from './types/dictionary-importer';
+import type { Utf16Range } from './types/parse';
 import type { FindTermsTextReplacements, SearchResolution } from './types/translation';
 
 export interface DictionarySelection {
@@ -39,7 +40,7 @@ export interface HeadwordCandidate {
 
 export interface ScannedToken {
     text: string;
-    range: { startUtf16: number; endUtf16: number };
+    range: Utf16Range;
     reading: string;
     selectable: boolean;
     headwords: HeadwordCandidate[];
@@ -65,7 +66,7 @@ export interface KanjiRequest {
 }
 
 export interface TermAtResult extends TermLookupResult {
-    range: { startUtf16: number; endUtf16: number };
+    range: Utf16Range;
 }
 
 export interface YomitanClient {
@@ -117,12 +118,11 @@ class YomitanClientImpl implements YomitanClient {
             import: async ({ source, signal, onProgress }) => {
                 signal?.throwIfAborted();
                 const result = await this.core.importDictionary(source, {
+                    signal,
                     onProgress: (progress) => {
-                        signal?.throwIfAborted();
                         onProgress?.(progress);
                     },
                 });
-                signal?.throwIfAborted();
                 return result;
             },
             remove: async (id) => this.core.deleteDictionary(id),
@@ -181,16 +181,21 @@ class YomitanClientImpl implements YomitanClient {
         if (!isUtf16Boundary(request.text, request.utf16Offset) || request.utf16Offset === request.text.length) {
             return null;
         }
-        const result = await this.terms({ ...request, text: request.text.slice(request.utf16Offset) });
+        const tokens = await this.scanLine(request);
+        const token = tokens.find(
+            ({ range, selectable }) =>
+                selectable && range.startUtf16 <= request.utf16Offset && request.utf16Offset < range.endUtf16,
+        );
+        if (!token) {
+            return null;
+        }
+        const result = await this.terms({ ...request, text: token.text });
         if (result.entries.length === 0 || result.originalTextLength <= 0) {
             return null;
         }
         return {
             ...result,
-            range: {
-                startUtf16: request.utf16Offset,
-                endUtf16: request.utf16Offset + result.originalTextLength,
-            },
+            range: token.range,
         };
     }
 

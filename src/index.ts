@@ -166,13 +166,14 @@ export class YomitanCore {
             onProgress?: DictionaryImporterTypes.OnProgressCallback;
             prefixWildcardsSupported?: boolean;
             yomitanVersion?: string;
+            signal?: AbortSignal;
         },
     ): Promise<DictionaryImporterTypes.ImportResult> {
         this._ensureInitialized();
         const { DictionaryImporterClass: DictionaryImporter } = await import('./import/dictionary-importer');
         const { NoOpMediaLoader } = await import('./import/media-loader');
 
-        const importer = new DictionaryImporter(new NoOpMediaLoader(), options?.onProgress);
+        const importer = new DictionaryImporter(new NoOpMediaLoader(), options?.onProgress, options?.signal);
         const details: DictionaryImporterTypes.ImportDetails = {
             prefixWildcardsSupported: options?.prefixWildcardsSupported ?? false,
             yomitanVersion: options?.yomitanVersion ?? '0.0.0',

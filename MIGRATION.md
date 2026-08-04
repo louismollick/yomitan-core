@@ -14,7 +14,7 @@ Key changes:
   `Map` values. The client converts them internally.
 - `lookup.scanLine` returns untrimmed source text plus UTF-16 ranges. Use those
   ranges for selection and follow-up lookup.
-- `lookup.termAt` accepts an exact UTF-16 offset and returns the matched range.
+- `lookup.termAt` accepts a UTF-16 offset inside a term and returns the matched range.
 - Imports are staged. A failed, cancelled, or interrupted new import is not
   listed or available to normal lookup, and startup removes staged rows.
 - Call `dispose()` when an app-lifetime client is torn down.

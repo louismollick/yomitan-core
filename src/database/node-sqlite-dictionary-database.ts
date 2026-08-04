@@ -133,6 +133,7 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
 
         const visited = new Set<number>();
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         const indexNames = matchType === 'suffix' ? ['expressionReverse', 'readingReverse'] : ['expression', 'reading'];
 
         for (let itemIndex = 0; itemIndex < termList.length; itemIndex += 1) {
@@ -153,7 +154,11 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
                           );
 
                 for (const row of rows) {
-                    if (!dictionaries.has(row.dictionary) || visited.has(row.id)) {
+                    if (
+                        !dictionaries.has(row.dictionary) ||
+                        stagedDictionaries.has(row.dictionary) ||
+                        visited.has(row.id)
+                    ) {
                         continue;
                     }
                     visited.add(row.id);
@@ -175,11 +180,16 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         dictionaries: DictionaryDatabase.DictionarySet,
     ): Promise<DictionaryDatabase.TermEntry[]> {
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let itemIndex = 0; itemIndex < termList.length; itemIndex += 1) {
             const item = termList[itemIndex];
             const rows = this._selectTerms('expression = ?', [item.term]);
             for (const row of rows) {
-                if (row.reading !== item.reading || !dictionaries.has(row.dictionary)) {
+                if (
+                    row.reading !== item.reading ||
+                    !dictionaries.has(row.dictionary) ||
+                    stagedDictionaries.has(row.dictionary)
+                ) {
                     continue;
                 }
                 results.push(this._createTerm('term', 'exact', row, itemIndex));
@@ -192,11 +202,12 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         items: DictionaryDatabase.DictionaryAndQueryRequest[],
     ): Promise<DictionaryDatabase.TermEntry[]> {
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
             const item = items[itemIndex];
             const rows = this._selectTerms('sequence = ?', [item.query]);
             for (const row of rows) {
-                if (row.dictionary !== item.dictionary) {
+                if (row.dictionary !== item.dictionary || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push(this._createTerm('sequence', 'exact', row, itemIndex));
@@ -210,12 +221,13 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         dictionaries: DictionaryDatabase.DictionarySet,
     ): Promise<DictionaryDatabase.TermMeta[]> {
         const results: DictionaryDatabase.TermMeta[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let itemIndex = 0; itemIndex < termList.length; itemIndex += 1) {
             const rows = this._selectJsonRows<DictionaryDatabase.DatabaseTermMeta>('termMeta', 'expression = ?', [
                 termList[itemIndex],
             ]);
             for (const row of rows) {
-                if (dictionaries.has(row.dictionary)) {
+                if (dictionaries.has(row.dictionary) && !stagedDictionaries.has(row.dictionary)) {
                     results.push(this._createTermMeta(row, itemIndex));
                 }
             }
@@ -228,12 +240,13 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         dictionaries: DictionaryDatabase.DictionarySet,
     ): Promise<DictionaryDatabase.KanjiEntry[]> {
         const results: DictionaryDatabase.KanjiEntry[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let itemIndex = 0; itemIndex < kanjiList.length; itemIndex += 1) {
             const rows = this._selectJsonRows<DictionaryDatabase.DatabaseKanjiEntry>('kanji', 'character = ?', [
                 kanjiList[itemIndex],
             ]);
             for (const row of rows) {
-                if (dictionaries.has(row.dictionary)) {
+                if (dictionaries.has(row.dictionary) && !stagedDictionaries.has(row.dictionary)) {
                     results.push(this._createKanji(row, itemIndex));
                 }
             }
@@ -246,12 +259,13 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         dictionaries: DictionaryDatabase.DictionarySet,
     ): Promise<DictionaryDatabase.KanjiMeta[]> {
         const results: DictionaryDatabase.KanjiMeta[] = [];
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let itemIndex = 0; itemIndex < kanjiList.length; itemIndex += 1) {
             const rows = this._selectJsonRows<DictionaryDatabase.DatabaseKanjiMeta>('kanjiMeta', 'character = ?', [
                 kanjiList[itemIndex],
             ]);
             for (const row of rows) {
-                if (!dictionaries.has(row.dictionary)) {
+                if (!dictionaries.has(row.dictionary) || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push({
@@ -270,8 +284,12 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         items: DictionaryDatabase.DictionaryAndQueryRequest[],
     ): Promise<(DictionaryDatabase.Tag | undefined)[]> {
         const results: (DictionaryDatabase.Tag | undefined)[] = new Array(items.length);
+        const stagedDictionaries = this._getStagedDictionaries();
         for (let i = 0; i < items.length; i += 1) {
             const item = items[i];
+            if (stagedDictionaries.has(item.dictionary)) {
+                continue;
+            }
             results[i] = this._selectJsonRows<DictionaryDatabase.Tag>('tagMeta', 'name = ? AND dictionary = ?', [
                 item.query,
                 item.dictionary,
@@ -281,6 +299,9 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
     }
 
     async findTagForTitle(name: string, dictionary: string): Promise<DictionaryDatabase.Tag | undefined> {
+        if (this._getStagedDictionaries().has(dictionary)) {
+            return undefined;
+        }
         return this._selectJsonRows<DictionaryDatabase.Tag>('tagMeta', 'name = ? AND dictionary = ?', [
             name,
             dictionary,
@@ -290,6 +311,7 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
     async getMedia(items: DictionaryDatabase.MediaRequest[]): Promise<DictionaryDatabase.Media[]> {
         const results: DictionaryDatabase.Media[] = [];
         const db = this._getDb();
+        const stagedDictionaries = this._getStagedDictionaries();
         const statement = db.prepare('SELECT * FROM media WHERE path = ? ORDER BY id');
 
         for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
@@ -302,7 +324,11 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
                 }
             >;
             for (const row of rows) {
-                if (row.dictionary !== item.dictionary || typeof row.content === 'undefined') {
+                if (
+                    row.dictionary !== item.dictionary ||
+                    stagedDictionaries.has(item.dictionary) ||
+                    typeof row.content === 'undefined'
+                ) {
                     continue;
                 }
                 results.push({
@@ -533,6 +559,11 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         for (const { title } of sessions) {
             recover(title);
         }
+    }
+
+    private _getStagedDictionaries(): Set<string> {
+        const sessions = this._getDb().prepare('SELECT title FROM import_sessions').all() as { title: string }[];
+        return new Set(sessions.map(({ title }) => title));
     }
 
     private _selectTerms(whereClause: string, parameters: unknown[]): DictionaryDatabase.DatabaseTermEntryWithId[] {

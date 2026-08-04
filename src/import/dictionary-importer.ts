@@ -20,11 +20,13 @@ export class DictionaryImporterClass {
     private _mediaLoader: MediaLoader;
     private _onProgress: DictionaryImporter.OnProgressCallback;
     private _progressData: DictionaryImporter.ProgressData;
+    private _signal: AbortSignal | undefined;
 
-    constructor(mediaLoader?: MediaLoader, onProgress?: DictionaryImporter.OnProgressCallback) {
+    constructor(mediaLoader?: MediaLoader, onProgress?: DictionaryImporter.OnProgressCallback, signal?: AbortSignal) {
         this._mediaLoader = mediaLoader ?? new NoOpMediaLoader();
         this._onProgress = typeof onProgress === 'function' ? onProgress : () => {};
         this._progressData = this._createProgressData();
+        this._signal = signal;
     }
 
     async importDictionary(
@@ -38,6 +40,7 @@ export class DictionaryImporterClass {
         if (!dictionaryDatabase.isOpen) {
             throw new Error('Database is not ready');
         }
+        this._signal?.throwIfAborted();
 
         const maxTransactionLength = 1000;
         const bulkAddProgressAllowance = 1000;
@@ -324,6 +327,12 @@ export class DictionaryImporterClass {
             } catch (cleanupError) {
                 errors.push(toError(cleanupError));
             }
+            if (this._signal?.aborted) {
+                if (errors.length === 1) {
+                    throw this._signal.reason;
+                }
+                throw new AggregateError(errors, 'Dictionary import cancellation cleanup failed');
+            }
             return { result: null, errors };
         }
 
@@ -409,7 +418,9 @@ export class DictionaryImporterClass {
     }
 
     private _progress(nextStep = false): void {
+        this._signal?.throwIfAborted();
         this._onProgress({ ...this._progressData, nextStep });
+        this._signal?.throwIfAborted();
     }
 
     // Summary creation

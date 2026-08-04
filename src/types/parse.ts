@@ -6,9 +6,11 @@ export type ParseTextHeadword = {
     sources: TermSource[];
 };
 
+export type Utf16Range = { startUtf16: number; endUtf16: number };
+
 export type ParseTextSegment = {
     text: string;
-    range: { startUtf16: number; endUtf16: number };
+    range: Utf16Range;
     reading: string;
     headwords?: ParseTextHeadword[][];
 };

@@ -102,6 +102,7 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
 
         const visited = new Set<number>();
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         const indexNames = matchType === 'suffix' ? ['expressionReverse', 'readingReverse'] : ['expression', 'reading'];
 
@@ -129,7 +130,7 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
                 const rows = await query.toArray();
 
                 for (const row of rows) {
-                    if (!dictionaries.has(row.dictionary)) {
+                    if (!dictionaries.has(row.dictionary) || stagedDictionaries.has(row.dictionary)) {
                         continue;
                     }
                     const { id } = row;
@@ -160,13 +161,18 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < termList.length; itemIndex++) {
             const item = termList[itemIndex];
             const rows = await this._db.terms.where('expression').equals(item.term).toArray();
 
             for (const row of rows) {
-                if (row.reading !== item.reading || !dictionaries.has(row.dictionary)) {
+                if (
+                    row.reading !== item.reading ||
+                    !dictionaries.has(row.dictionary) ||
+                    stagedDictionaries.has(row.dictionary)
+                ) {
                     continue;
                 }
                 results.push(this._createTerm('term', 'exact', row, itemIndex));
@@ -184,13 +190,14 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.TermEntry[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
             const item = items[itemIndex];
             const rows = await this._db.terms.where('sequence').equals(item.query).toArray();
 
             for (const row of rows) {
-                if (row.dictionary !== item.dictionary) {
+                if (row.dictionary !== item.dictionary || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push(this._createTerm('sequence', 'exact', row, itemIndex));
@@ -209,13 +216,14 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.TermMeta[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < termList.length; itemIndex++) {
             const term = termList[itemIndex];
             const rows = await this._db.termMeta.where('expression').equals(term).toArray();
 
             for (const row of rows) {
-                if (!dictionaries.has(row.dictionary)) {
+                if (!dictionaries.has(row.dictionary) || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push(this._createTermMeta(row, itemIndex));
@@ -234,13 +242,14 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.KanjiEntry[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < kanjiList.length; itemIndex++) {
             const character = kanjiList[itemIndex];
             const rows = await this._db.kanji.where('character').equals(character).toArray();
 
             for (const row of rows) {
-                if (!dictionaries.has(row.dictionary)) {
+                if (!dictionaries.has(row.dictionary) || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push(this._createKanji(row, itemIndex));
@@ -259,13 +268,14 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.KanjiMeta[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < kanjiList.length; itemIndex++) {
             const character = kanjiList[itemIndex];
             const rows = await this._db.kanjiMeta.where('character').equals(character).toArray();
 
             for (const row of rows) {
-                if (!dictionaries.has(row.dictionary)) {
+                if (!dictionaries.has(row.dictionary) || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push({
@@ -285,9 +295,13 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         items: DictionaryDatabase.DictionaryAndQueryRequest[],
     ): Promise<(DictionaryDatabase.Tag | undefined)[]> {
         const results: (DictionaryDatabase.Tag | undefined)[] = new Array(items.length);
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
+            if (stagedDictionaries.has(item.dictionary)) {
+                continue;
+            }
             const row = await this._db.tagMeta
                 .where('name')
                 .equals(item.query)
@@ -300,6 +314,9 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
     }
 
     async findTagForTitle(name: string, dictionary: string): Promise<DictionaryDatabase.Tag | undefined> {
+        if ((await this._getStagedDictionaries()).has(dictionary)) {
+            return undefined;
+        }
         return await this._db.tagMeta
             .where('name')
             .equals(name)
@@ -313,13 +330,14 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         }
 
         const results: DictionaryDatabase.Media[] = [];
+        const stagedDictionaries = await this._getStagedDictionaries();
 
         for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
             const item = items[itemIndex];
             const rows = await this._db.media.where('path').equals(item.path).toArray();
 
             for (const row of rows) {
-                if (row.dictionary !== item.dictionary) {
+                if (row.dictionary !== item.dictionary || stagedDictionaries.has(row.dictionary)) {
                     continue;
                 }
                 results.push({
@@ -445,6 +463,11 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         for (const { title } of sessions) {
             await this.deleteDictionary(title);
         }
+    }
+
+    private async _getStagedDictionaries(): Promise<Set<string>> {
+        const sessions = (await this._db.importSessions.toArray()) as { title: string }[];
+        return new Set(sessions.map(({ title }) => title));
     }
 
     // Private result creators

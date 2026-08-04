@@ -55,7 +55,7 @@ describe('YomitanClient v2', () => {
         expect(() => JSON.stringify(tokens)).not.toThrow();
     });
 
-    it('looks up the term beginning at an exact UTF-16 offset', async () => {
+    it('looks up the term containing an exact UTF-16 offset', async () => {
         const client = await createPopulatedClient();
         const request = {
             text: '🙂食べた、食べた',
@@ -67,6 +67,9 @@ describe('YomitanClient v2', () => {
 
         expect(result?.range).toEqual({ startUtf16: 2, endUtf16: 5 });
         expect(result?.entries[0].headwords.some((headword) => headword.term === '食べる')).toBe(true);
+        await expect(client.lookup.termAt({ ...request, utf16Offset: 4 })).resolves.toMatchObject({
+            range: { startUtf16: 2, endUtf16: 5 },
+        });
         await expect(client.lookup.termAt({ ...request, utf16Offset: 1 })).resolves.toBeNull();
         await expect(client.lookup.termAt({ ...request, utf16Offset: request.text.length + 1 })).resolves.toBeNull();
     });
@@ -82,6 +85,30 @@ describe('YomitanClient v2', () => {
                 signal: controller.signal,
                 onProgress: (progress) => {
                     if (progress.index > 0) {
+                        controller.abort();
+                    }
+                },
+            }),
+        ).rejects.toThrow();
+
+        await expect(client.dictionaries.list()).resolves.toEqual([]);
+    });
+
+    it('cancels at the final progress boundary before activation', async () => {
+        const client = await createClient();
+        const { consumerTerms } = await getConsumerE2eFixtures();
+        const controller = new AbortController();
+        let sawDataProgress = false;
+
+        await expect(
+            client.dictionaries.import({
+                source: consumerTerms,
+                signal: controller.signal,
+                onProgress: ({ count, index, nextStep }) => {
+                    if (!nextStep && index > 0) {
+                        sawDataProgress = true;
+                    }
+                    if (sawDataProgress && nextStep && count === 0) {
                         controller.abort();
                     }
                 },

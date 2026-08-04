@@ -56,6 +56,7 @@ describe.each(backends)('import recovery ($name)', ({ create, location: createLo
             0,
             1,
         );
+        await expect(interrupted.findTermsBulk(['未完了'], new Set(['Interrupted']), 'exact')).resolves.toEqual([]);
         interrupted.close();
 
         const recovered = create(location);
