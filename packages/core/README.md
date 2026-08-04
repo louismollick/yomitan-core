@@ -367,13 +367,9 @@ npm install
 | Command | Description |
 |---------|-------------|
 | `npm run build` | Build ESM + CJS + .d.ts with tsdown |
-| `npm run dev` | Watch mode build |
 | `npm run typecheck` | TypeScript type checking (`tsc --noEmit`) |
 | `npm run lint` | Biome lint + format check |
-| `npm run lint:fix` | Auto-fix lint and formatting issues |
-| `npm run format` | Format all files with Biome |
 | `npm run test` | Run tests with vitest |
-| `npm run test:watch` | Watch mode tests |
 
 ### Automated versioning and releases
 

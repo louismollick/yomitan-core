@@ -29,7 +29,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@yomitan-core/web-renderer": "2.0.0",
-        "yomitan-core": "2.0.0"
+        "@yomitan-core/web-renderer": "^2.0.0",
+        "yomitan-core": "^2.0.0"
     }
 }
