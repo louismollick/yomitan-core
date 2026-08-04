@@ -158,7 +158,7 @@ describe('SentenceParser (scanning parser parity)', () => {
         });
 
         expect(parsed).toHaveLength(1);
-        expect(parsed[0]).toEqual([{ text: '、。！？', reading: '' }]);
+        expect(parsed[0]).toEqual([{ text: '、。！？', range: { startUtf16: 0, endUtf16: 4 }, reading: '' }]);
         expect(parsed[0][0].headwords).toBeUndefined();
     });
 });

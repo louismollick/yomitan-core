@@ -42,6 +42,8 @@ export type DictionaryDatabaseBackend = {
     getDictionaryInfo(): Promise<DictionaryImporter.Summary[]>;
     getDictionaryCounts(dictionaryNames: string[], getTotal: boolean): Promise<DictionaryDatabase.DictionaryCounts>;
     dictionaryExists(title: string): Promise<boolean>;
+    beginImport(title: string): Promise<void>;
+    commitImport(title: string, summary: DictionaryImporter.Summary): Promise<void>;
     bulkAdd(
         objectStoreName: DictionaryDatabase.ObjectStoreName,
         items: unknown[],

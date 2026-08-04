@@ -262,33 +262,37 @@ async function createFixtures(): Promise<FixtureSet> {
     };
 }
 
-async function createArchive(input: ArchiveInput, options?: { omitIndex?: boolean }): Promise<ArrayBuffer> {
+export async function createArchive(
+    input: ArchiveInput,
+    options?: { omitIndex?: boolean; pathPrefix?: string },
+): Promise<ArrayBuffer> {
     const writer = new Uint8ArrayWriter();
     const zipWriter = new ZipWriter(writer, { useWebWorkers: false });
+    const pathPrefix = options?.pathPrefix ?? '';
 
     if (!options?.omitIndex) {
-        await zipWriter.add('index.json', new TextReader(JSON.stringify(input.index)));
+        await zipWriter.add(`${pathPrefix}index.json`, new TextReader(JSON.stringify(input.index)));
     }
     if (input.termBank) {
-        await zipWriter.add('term_bank_1.json', new TextReader(JSON.stringify(input.termBank)));
+        await zipWriter.add(`${pathPrefix}term_bank_1.json`, new TextReader(JSON.stringify(input.termBank)));
     }
     if (input.termMetaBank) {
-        await zipWriter.add('term_meta_bank_1.json', new TextReader(JSON.stringify(input.termMetaBank)));
+        await zipWriter.add(`${pathPrefix}term_meta_bank_1.json`, new TextReader(JSON.stringify(input.termMetaBank)));
     }
     if (input.kanjiBank) {
-        await zipWriter.add('kanji_bank_1.json', new TextReader(JSON.stringify(input.kanjiBank)));
+        await zipWriter.add(`${pathPrefix}kanji_bank_1.json`, new TextReader(JSON.stringify(input.kanjiBank)));
     }
     if (input.kanjiMetaBank) {
-        await zipWriter.add('kanji_meta_bank_1.json', new TextReader(JSON.stringify(input.kanjiMetaBank)));
+        await zipWriter.add(`${pathPrefix}kanji_meta_bank_1.json`, new TextReader(JSON.stringify(input.kanjiMetaBank)));
     }
     if (input.tagBank) {
-        await zipWriter.add('tag_bank_1.json', new TextReader(JSON.stringify(input.tagBank)));
+        await zipWriter.add(`${pathPrefix}tag_bank_1.json`, new TextReader(JSON.stringify(input.tagBank)));
     }
     if (typeof input.styles === 'string') {
-        await zipWriter.add('styles.css', new TextReader(input.styles));
+        await zipWriter.add(`${pathPrefix}styles.css`, new TextReader(input.styles));
     }
     for (const [name, data] of Object.entries(input.files ?? {})) {
-        await zipWriter.add(name, new Uint8ArrayReader(data));
+        await zipWriter.add(`${pathPrefix}${name}`, new Uint8ArrayReader(data));
     }
 
     const archive = await zipWriter.close();

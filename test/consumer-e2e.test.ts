@@ -254,6 +254,62 @@ describe.each(storageBackends)('consumer-driven e2e contracts ($name)', (storage
         expect(primaryEntry?.frequencies[0]?.frequency).toBe(100);
     });
 
+    it('supports direct storage queries required by translator and renderer adapters', async () => {
+        const core = await createPopulatedCore(storageBackend, 'consumer-storage-contract');
+        const database = core.database;
+        const dictionaries = new Set([TERM_DICTIONARY_TITLE]);
+
+        const exact = await database.findTermsExactBulk([{ term: '食べる', reading: 'たべる' }], dictionaries);
+        expect(exact[0].term).toBe('食べる');
+        await expect(
+            database.findTermsExactBulk([{ term: '食べる', reading: 'wrong' }], dictionaries),
+        ).resolves.toEqual([]);
+
+        await expect(database.findTermsBulk([], dictionaries, 'exact')).resolves.toEqual([]);
+        expect((await database.findTermsBulk(['食べ'], dictionaries, 'prefix'))[0].term).toBe('食べる');
+        await expect(database.findTermsBulk(['食べる'], dictionaries, 'suffix')).resolves.toEqual([]);
+        await expect(database.findTermsBulk(['食べる'], new Set(), 'exact')).resolves.toEqual([]);
+
+        const sequence = await database.findTermsBySequenceBulk([{ dictionary: TERM_DICTIONARY_TITLE, query: 1 }]);
+        expect(sequence[0].term).toBe('食べる');
+        await expect(database.findTermsBySequenceBulk([{ dictionary: 'Wrong dictionary', query: 1 }])).resolves.toEqual(
+            [],
+        );
+
+        await expect(database.findTermMetaBulk(['食べる'], new Set())).resolves.toEqual([]);
+        await expect(database.findKanjiBulk(['食'], new Set())).resolves.toEqual([]);
+        await expect(database.findKanjiMetaBulk(['食'], new Set())).resolves.toEqual([]);
+
+        const tag = await database.findTagForTitle('v1', TERM_DICTIONARY_TITLE);
+        expect(tag?.category).toBe('partOfSpeech');
+        await expect(database.findTagForTitle('missing', TERM_DICTIONARY_TITLE)).resolves.toBeUndefined();
+
+        const media = await database.getMedia([{ dictionary: TERM_DICTIONARY_TITLE, path: 'images/sample.png' }]);
+        expect(media[0].content.byteLength).toBeGreaterThan(0);
+        await expect(database.getMedia([])).resolves.toEqual([]);
+        await expect(
+            database.getMedia([{ dictionary: 'Wrong dictionary', path: 'images/sample.png' }]),
+        ).resolves.toEqual([]);
+
+        const counts = await database.getDictionaryCounts([TERM_DICTIONARY_TITLE], true);
+        expect(counts.total?.terms).toBeGreaterThan(0);
+        await expect(database.dictionaryExists('missing')).resolves.toBe(false);
+
+        await expect(database.bulkAdd('terms', [], 0, 1)).resolves.toBeUndefined();
+        await expect(database.bulkUpdate('dictionaries', [], 0, 1)).resolves.toBeUndefined();
+
+        const summary = (await database.getDictionaryInfo())[0];
+        const temporaryKey = await database.addWithResult('dictionaries', { ...summary, title: 'Temporary' });
+        await database.bulkUpdate(
+            'dictionaries',
+            [{ primaryKey: temporaryKey, data: { ...summary, title: 'Temporary updated' } }],
+            0,
+            1,
+        );
+        await expect(database.dictionaryExists('Temporary updated')).resolves.toBe(true);
+        await database.deleteDictionary('Temporary updated', () => {});
+    });
+
     it('builds lapis-style anki notes from term lookups and handles no-entry', async () => {
         const core = await createPopulatedCore(storageBackend, 'consumer-lapis-note');
         const dictionaryInfo = await core.getDictionaryInfo();
@@ -596,9 +652,9 @@ describe.each(storageBackends)('consumer-driven e2e contracts ($name)', (storage
         const brokenCore = await createCore(storageBackend, 'consumer-broken');
         const brokenResult = await brokenCore.importDictionary(partialFailure);
         expect(brokenResult.errors.length).toBeGreaterThan(0);
-        expect(brokenResult.result?.importSuccess).toBe(false);
+        expect(brokenResult.result).toBeNull();
         const brokenInfo = await brokenCore.getDictionaryInfo();
-        expect(brokenInfo[0].importSuccess).toBe(false);
+        expect(brokenInfo).toEqual([]);
 
         const missingIndexCore = await createCore(storageBackend, 'consumer-missing-index');
         await expect(missingIndexCore.importDictionary(missingIndex)).rejects.toThrow('No dictionary index found');

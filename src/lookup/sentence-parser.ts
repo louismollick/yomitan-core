@@ -172,7 +172,7 @@ export class SentenceParser {
                     (originalTextLength !== character.length || isCodePointJapanese(codePoint))
                 ) {
                     const source = substring.substring(0, originalTextLength);
-                    segments = this._createMatchedSegments(source, dictionaryEntries);
+                    segments = this._createMatchedSegments(source, dictionaryEntries, i);
                 }
 
                 cached = {
@@ -194,12 +194,14 @@ export class SentenceParser {
                 if (previousUngroupedSegment === null) {
                     previousUngroupedSegment = {
                         text: character,
+                        range: { startUtf16: i, endUtf16: i + character.length },
                         reading: '',
                     };
                     result.push(previousUngroupedSegment);
                     unmatchedSegmentCount += 1;
                 } else {
                     previousUngroupedSegment.text += character;
+                    previousUngroupedSegment.range.endUtf16 += character.length;
                 }
                 i += character.length;
             }
@@ -222,7 +224,11 @@ export class SentenceParser {
         return result;
     }
 
-    private _createMatchedSegments(source: string, dictionaryEntries: TermDictionaryEntry[]): ParseTextSegment[] {
+    private _createMatchedSegments(
+        source: string,
+        dictionaryEntries: TermDictionaryEntry[],
+        startUtf16: number,
+    ): ParseTextSegment[] {
         if (dictionaryEntries.length === 0) {
             return [];
         }
@@ -257,6 +263,7 @@ export class SentenceParser {
         return [
             {
                 text: source,
+                range: { startUtf16, endUtf16: startUtf16 + source.length },
                 reading: firstHeadword.reading ?? '',
                 ...(trimmedHeadwords.length > 0 ? { headwords: trimmedHeadwords } : {}),
             },

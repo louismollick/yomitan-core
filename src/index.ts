@@ -1,6 +1,7 @@
 import { buildAnkiNoteFromTerm as buildAnkiNoteFromTermLookup } from './anki/anki-note-service';
 import type { BuildAnkiNoteFromDictionaryEntryInput, BuildAnkiNoteFromTermResult } from './anki/anki-note-service';
 import type { DictionaryMarkerSource } from './anki/anki-template-util';
+import { type CreateYomitanOptions, type YomitanClient, createYomitanClient } from './client';
 // Main entry point for yomitan-core
 import type { DictionaryDatabaseBackend } from './database/backend';
 import { DictionaryDB } from './database/dictionary-database';
@@ -17,6 +18,8 @@ import type * as DictionaryDatabase from './types/dictionary-database';
 import type * as DictionaryImporterTypes from './types/dictionary-importer';
 import type * as Translation from './types/translation';
 import { codePointPreview, debugYomitanCore } from './util/debug';
+
+export * from './client';
 
 // Re-export all types
 export * from './types/index';
@@ -424,6 +427,12 @@ export class YomitanCore {
             throw new Error('YomitanCore is not initialized. Call initialize() first.');
         }
     }
+}
+
+export function createYomitan(options: CreateYomitanOptions): YomitanClient {
+    return createYomitanClient(
+        new YomitanCore({ storageAdapter: options.storage, initLanguage: options.initLanguage }),
+    );
 }
 
 // Default export

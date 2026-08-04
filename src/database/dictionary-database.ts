@@ -17,6 +17,7 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
     async open(): Promise<void> {
         await this._db.open();
         this._isOpen = true;
+        await this._recoverIncompleteImports();
     }
 
     close(): void {
@@ -85,6 +86,7 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
 
         // Delete from dictionaries store
         await this._db.dictionaries.where('title').equals(dictionaryName).delete();
+        await this._db.importSessions.delete(dictionaryName);
         progressData.storesProcesed++;
         onProgress?.(progressData);
     }
@@ -383,6 +385,17 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         return result !== undefined;
     }
 
+    async beginImport(title: string): Promise<void> {
+        await this._db.importSessions.add({ title, startedAt: Date.now() });
+    }
+
+    async commitImport(title: string, summary: DictionaryImporter.Summary): Promise<void> {
+        await this._db.transaction('rw', this._db.dictionaries, this._db.importSessions, async () => {
+            await this._db.dictionaries.add(summary);
+            await this._db.importSessions.delete(title);
+        });
+    }
+
     async bulkAdd(
         objectStoreName: DictionaryDatabase.ObjectStoreName,
         items: unknown[],
@@ -425,6 +438,13 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
             batch.map((item) => item.data),
             batch.map((item) => item.primaryKey),
         );
+    }
+
+    private async _recoverIncompleteImports(): Promise<void> {
+        const sessions = (await this._db.importSessions.toArray()) as { title: string }[];
+        for (const { title } of sessions) {
+            await this.deleteDictionary(title);
+        }
     }
 
     // Private result creators

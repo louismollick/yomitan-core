@@ -39,7 +39,6 @@ export class DictionaryImporterClass {
             throw new Error('Database is not ready');
         }
 
-        const errors: Error[] = [];
         const maxTransactionLength = 1000;
         const bulkAddProgressAllowance = 1000;
 
@@ -60,11 +59,7 @@ export class DictionaryImporterClass {
             for (let i = 0; i < entryCount; i += maxTransactionLength) {
                 const count = Math.min(maxTransactionLength, entryCount - i);
 
-                try {
-                    await dictionaryDatabase.bulkAdd(objectStoreName, entries, i, count);
-                } catch (e) {
-                    errors.push(toError(e));
-                }
+                await dictionaryDatabase.bulkAdd(objectStoreName, entries, i, count);
 
                 this._progressData.index += progressIndexIncrease;
                 this._progress();
@@ -132,6 +127,16 @@ export class DictionaryImporterClass {
             await this._validateFile(tagFile, dataBankSchemas[4]);
         }
 
+        const stylesFile = fileMap.get('styles.css');
+        let styles = '';
+        if (typeof stylesFile !== 'undefined') {
+            styles = await this._getData(stylesFile as Entry, new TextWriter());
+            const cssErrors = this._validateCss(styles);
+            if (cssErrors.length > 0) {
+                return { errors: cssErrors, result: null };
+            }
+        }
+
         // termFiles is doubled due to media importing
         this._progressNextStep(
             (termFiles.length * 2 +
@@ -141,8 +146,6 @@ export class DictionaryImporterClass {
                 tagFiles.length) *
                 bulkAddProgressAllowance,
         );
-
-        let importSuccess = false;
 
         const counts: DictionaryImporter.SummaryCounts = {
             terms: { total: 0 },
@@ -154,18 +157,17 @@ export class DictionaryImporterClass {
         };
 
         const yomitanVersion = details.yomitanVersion;
-        let summaryDetails: DictionaryImporter.SummaryDetails = {
+        const summaryDetails: DictionaryImporter.SummaryDetails = {
             prefixWildcardsSupported,
             counts,
-            styles: '',
+            styles,
             yomitanVersion,
-            importSuccess,
+            importSuccess: true,
         };
-
-        let summary = this._createSummary(dictionaryTitle, version, index, summaryDetails);
-        const primaryKey = await dictionaryDatabase.addWithResult('dictionaries', summary);
+        const summary = this._createSummary(dictionaryTitle, version, index, summaryDetails);
 
         try {
+            await dictionaryDatabase.beginImport(dictionaryTitle);
             const uniqueMediaPaths = new Set<string>();
             for (const termFile of termFiles) {
                 const requirements: DictionaryImporter.ImportRequirement[] = [];
@@ -312,35 +314,20 @@ export class DictionaryImporterClass {
                 tagList = [];
             }
 
-            importSuccess = true;
+            this._progressNextStep(0);
+            this._progress();
+            await dictionaryDatabase.commitImport(dictionaryTitle, summary);
         } catch (e) {
-            errors.push(toError(e));
-        }
-
-        // Update dictionary descriptor
-        this._progressNextStep(0);
-
-        const stylesFileName = 'styles.css';
-        const stylesFile = fileMap.get(stylesFileName);
-        let styles = '';
-        if (typeof stylesFile !== 'undefined') {
-            styles = await this._getData(stylesFile as Entry, new TextWriter());
-            const cssErrors = this._validateCss(styles);
-            if (cssErrors.length > 0) {
-                return {
-                    errors: cssErrors,
-                    result: null,
-                };
+            const errors = [toError(e)];
+            try {
+                await dictionaryDatabase.deleteDictionary(dictionaryTitle);
+            } catch (cleanupError) {
+                errors.push(toError(cleanupError));
             }
+            return { result: null, errors };
         }
 
-        summaryDetails = { prefixWildcardsSupported, counts, styles, yomitanVersion, importSuccess };
-        summary = this._createSummary(dictionaryTitle, version, index, summaryDetails);
-        await dictionaryDatabase.bulkUpdate('dictionaries', [{ data: summary, primaryKey }], 0, 1);
-
-        this._progress();
-
-        return { result: summary, errors };
+        return { result: summary, errors: [] };
     }
 
     // Archive reading

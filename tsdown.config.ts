@@ -13,10 +13,15 @@ export default defineConfig({
         audio: 'src/audio/index.ts',
     },
     format: ['esm', 'cjs'],
-    dts: { transformer: 'typescript' },
+    dts: true,
+    fixedExtension: false,
     clean: true,
     treeshake: true,
     splitting: true,
     sourcemap: true,
-    external: ['linkedom', '@resvg/resvg-wasm', 'hangul-js', 'kanji-processor'],
+    deps: {
+        neverBundle: ['linkedom', '@resvg/resvg-wasm', 'hangul-js'],
+        alwaysBundle: [/^kanji-processor(?:\/|$)/],
+    },
+    outputOptions: { exports: 'named' },
 });

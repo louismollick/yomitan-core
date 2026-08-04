@@ -8,6 +8,7 @@ export type ParseTextHeadword = {
 
 export type ParseTextSegment = {
     text: string;
+    range: { startUtf16: number; endUtf16: number };
     reading: string;
     headwords?: ParseTextHeadword[][];
 };

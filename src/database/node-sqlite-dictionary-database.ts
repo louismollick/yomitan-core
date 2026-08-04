@@ -45,6 +45,7 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         this._db.pragma('foreign_keys = ON');
         this._createSchema();
         this._isOpen = true;
+        this._recoverIncompleteImports();
     }
 
     close(): void {
@@ -116,6 +117,7 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         }
 
         db.prepare('DELETE FROM dictionaries WHERE title = ?').run(dictionaryName);
+        db.prepare('DELETE FROM import_sessions WHERE title = ?').run(dictionaryName);
         progressData.storesProcesed += 1;
         onProgress?.(progressData);
     }
@@ -360,6 +362,22 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         return typeof row !== 'undefined';
     }
 
+    async beginImport(title: string): Promise<void> {
+        this._getDb().prepare('INSERT INTO import_sessions (title, startedAt) VALUES (?, ?)').run(title, Date.now());
+    }
+
+    async commitImport(title: string, summary: DictionaryImporter.Summary): Promise<void> {
+        const db = this._getDb();
+        db.transaction(() => {
+            db.prepare('INSERT INTO dictionaries (title, version, data) VALUES (?, ?, ?)').run(
+                summary.title,
+                summary.version,
+                JSON.stringify(summary),
+            );
+            db.prepare('DELETE FROM import_sessions WHERE title = ?').run(title);
+        })();
+    }
+
     async bulkAdd(
         objectStoreName: DictionaryDatabase.ObjectStoreName,
         items: unknown[],
@@ -494,7 +512,27 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
             );
             CREATE INDEX IF NOT EXISTS media_path_idx ON media(path);
             CREATE INDEX IF NOT EXISTS media_dictionary_idx ON media(dictionary);
+
+            CREATE TABLE IF NOT EXISTS import_sessions (
+                title TEXT PRIMARY KEY,
+                startedAt INTEGER NOT NULL
+            );
         `);
+    }
+
+    private _recoverIncompleteImports(): void {
+        const db = this._getDb();
+        const sessions = db.prepare('SELECT title FROM import_sessions').all() as { title: string }[];
+        const recover = db.transaction((title: string) => {
+            for (const table of DELETE_TARGETS) {
+                db.prepare(`DELETE FROM ${table} WHERE dictionary = ?`).run(title);
+            }
+            db.prepare('DELETE FROM dictionaries WHERE title = ?').run(title);
+            db.prepare('DELETE FROM import_sessions WHERE title = ?').run(title);
+        });
+        for (const { title } of sessions) {
+            recover(title);
+        }
     }
 
     private _selectTerms(whereClause: string, parameters: unknown[]): DictionaryDatabase.DatabaseTermEntryWithId[] {

@@ -9,6 +9,7 @@ export class YomitanDatabase extends Dexie {
     tagMeta!: Dexie.Table;
     dictionaries!: Dexie.Table;
     media!: Dexie.Table;
+    importSessions!: Dexie.Table;
 
     constructor(name = 'dict') {
         super(name);
@@ -55,6 +56,17 @@ export class YomitanDatabase extends Dexie {
             termMeta: '++, dictionary, expression',
             kanjiMeta: '++, dictionary, character',
             media: '++id, dictionary, path',
+        });
+
+        this.version(70).stores({
+            terms: '++id, dictionary, expression, reading, sequence, expressionReverse, readingReverse',
+            kanji: '++, dictionary, character',
+            tagMeta: '++, dictionary, name',
+            dictionaries: '++, title, version',
+            termMeta: '++, dictionary, expression',
+            kanjiMeta: '++, dictionary, character',
+            media: '++id, dictionary, path',
+            importSessions: 'title',
         });
     }
 }
