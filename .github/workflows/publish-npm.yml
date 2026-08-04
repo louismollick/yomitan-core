@@ -107,6 +107,7 @@ jobs:
           -p semantic-release
           -p @semantic-release/changelog
           -p @semantic-release/commit-analyzer
+          -p @semantic-release/exec@7.1.0
           -p @semantic-release/git
           -p @semantic-release/github
           -p @semantic-release/npm

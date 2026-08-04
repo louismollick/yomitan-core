@@ -19,6 +19,12 @@
         "pkgRoot": "packages/core"
       }
     ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "npm install --package-lock-only --ignore-scripts"
+      }
+    ],
     "@semantic-release/github",
     [
       "@semantic-release/git",

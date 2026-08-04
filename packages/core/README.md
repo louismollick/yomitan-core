@@ -1,5 +1,7 @@
 # yomitan-core
 
+> v2 migration status: this package retains the v1 browser, Node, renderer, audio, and Anki compatibility APIs while they move into private platform workspaces. See the repository root README for current package boundaries. Do not treat the private scoped facades as publishable platform implementations yet.
+
 Core dictionary lookup, language processing, and rendering engine extracted from the [Yomitan](https://github.com/louismollick/yomitan) browser extension. Use it in Node.js, Electron, or any JavaScript environment with IndexedDB.
 
 ## Installation

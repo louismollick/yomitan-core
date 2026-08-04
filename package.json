@@ -12,10 +12,12 @@
   ],
   "scripts": {
     "build": "npm run build -w yomitan-core && npm run build -w @yomitan-core/web-renderer && npm run build -w @yomitan-core/web && npm run build -w @yomitan-core/node && npm run build -w @yomitan-core/react-native",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run build && npm run typecheck:workspaces",
+    "typecheck:workspaces": "npm run typecheck --workspaces --if-present",
+    "test": "npm run build && npm run test:workspaces",
+    "test:workspaces": "npm run test --workspaces --if-present",
     "lint": "biome check .",
-    "verify": "npm run build && npm run typecheck && npm test && npm run lint",
+    "verify": "npm run build && npm run typecheck:workspaces && npm run test:workspaces && npm run lint",
     "prepare": "husky"
   }
 }
