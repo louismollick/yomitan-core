@@ -388,8 +388,16 @@ export class NodeSqliteDictionaryDB implements DictionaryDatabaseBackend {
         return typeof row !== 'undefined';
     }
 
-    async beginImport(title: string): Promise<void> {
-        this._getDb().prepare('INSERT INTO import_sessions (title, startedAt) VALUES (?, ?)').run(title, Date.now());
+    async beginImport(title: string): Promise<boolean> {
+        const result = this._getDb()
+            .prepare(
+                `INSERT INTO import_sessions (title, startedAt)
+                SELECT ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM dictionaries WHERE title = ?)
+                ON CONFLICT(title) DO NOTHING`,
+            )
+            .run(title, Date.now(), title);
+        return result.changes === 1;
     }
 
     async commitImport(title: string, summary: DictionaryImporter.Summary): Promise<void> {

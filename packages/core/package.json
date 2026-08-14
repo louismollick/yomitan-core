@@ -4,7 +4,7 @@
   "description": "Core dictionary lookup, language processing, and rendering engine extracted from the Yomitan browser extension.",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -85,7 +85,7 @@
   "dependencies": {
     "@zip.js/zip.js": "^2.7.54",
     "ajv": "^8.17.1",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.11.1",
     "dexie": "^4.0.10",
     "handlebars": "^4.7.8",
     "linkedom": "^0.18.10",

@@ -169,8 +169,17 @@ export class DictionaryImporterClass {
         };
         const summary = this._createSummary(dictionaryTitle, version, index, summaryDetails);
 
+        let importStarted = false;
         try {
-            await dictionaryDatabase.beginImport(dictionaryTitle);
+            importStarted = await dictionaryDatabase.beginImport(dictionaryTitle);
+            if (!importStarted) {
+                return {
+                    errors: [
+                        new Error(`Dictionary ${dictionaryTitle} is already imported or being imported, skipped it.`),
+                    ],
+                    result: null,
+                };
+            }
             const uniqueMediaPaths = new Set<string>();
             for (const termFile of termFiles) {
                 const requirements: DictionaryImporter.ImportRequirement[] = [];
@@ -322,10 +331,12 @@ export class DictionaryImporterClass {
             await dictionaryDatabase.commitImport(dictionaryTitle, summary);
         } catch (e) {
             const errors = [toError(e)];
-            try {
-                await dictionaryDatabase.deleteDictionary(dictionaryTitle);
-            } catch (cleanupError) {
-                errors.push(toError(cleanupError));
+            if (importStarted) {
+                try {
+                    await dictionaryDatabase.deleteDictionary(dictionaryTitle);
+                } catch (cleanupError) {
+                    errors.push(toError(cleanupError));
+                }
             }
             if (this._signal?.aborted) {
                 if (errors.length === 1) {

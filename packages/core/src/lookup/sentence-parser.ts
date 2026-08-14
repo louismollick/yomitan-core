@@ -51,7 +51,7 @@ export interface SentenceParserOptions {
 
 interface ParseScanCacheEntry {
     originalTextLength: number;
-    segments: ParseTextSegment[];
+    dictionaryEntries: TermDictionaryEntry[];
 }
 
 /**
@@ -154,7 +154,6 @@ export class SentenceParser {
                 );
                 lookupCount += 1;
 
-                let segments: ParseTextSegment[] = [];
                 if (dictionaryEntries.length === 0) {
                     emptyEntryLookups += 1;
                     if (lookupMissSamples.length < 5) {
@@ -166,25 +165,25 @@ export class SentenceParser {
                     }
                 }
 
-                if (
-                    dictionaryEntries.length > 0 &&
-                    originalTextLength > 0 &&
-                    (originalTextLength !== character.length || isCodePointJapanese(codePoint))
-                ) {
-                    const source = substring.substring(0, originalTextLength);
-                    segments = this._createMatchedSegments(source, dictionaryEntries, i);
-                }
-
                 cached = {
                     originalTextLength,
-                    segments,
+                    dictionaryEntries,
                 };
                 cache.set(substring, cached);
             } else {
                 cacheHits += 1;
             }
 
-            const { originalTextLength, segments } = cached;
+            const { originalTextLength, dictionaryEntries } = cached;
+            let segments: ParseTextSegment[] = [];
+            if (
+                dictionaryEntries.length > 0 &&
+                originalTextLength > 0 &&
+                (originalTextLength !== character.length || isCodePointJapanese(codePoint))
+            ) {
+                const source = substring.substring(0, originalTextLength);
+                segments = this._createMatchedSegments(source, dictionaryEntries, i);
+            }
             if (segments.length > 0) {
                 previousUngroupedSegment = null;
                 result.push(...segments);

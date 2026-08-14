@@ -161,4 +161,19 @@ describe('SentenceParser (scanning parser parity)', () => {
         expect(parsed[0]).toEqual([{ text: '、。！？', range: { startUtf16: 0, endUtf16: 4 }, reading: '' }]);
         expect(parsed[0][0].headwords).toBeUndefined();
     });
+
+    it('positions repeated cached matches at their own UTF-16 offsets', async () => {
+        const parser = new SentenceParser(translatorMock as any);
+        const parsed = await parser.parseText('ボスボス', 'ja', {
+            enabledDictionaryMap: new Map([
+                ['TestDict', { index: 0, alias: 'TestDict', useDeinflections: true, partsOfSpeechFilter: true }],
+            ]),
+            scanLength: 2,
+        });
+
+        expect(parsed[0].map(({ range }) => range)).toEqual([
+            { startUtf16: 0, endUtf16: 2 },
+            { startUtf16: 2, endUtf16: 4 },
+        ]);
+    });
 });

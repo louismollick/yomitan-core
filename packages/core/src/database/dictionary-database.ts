@@ -403,8 +403,18 @@ export class DictionaryDB implements DictionaryDatabaseBackend {
         return result !== undefined;
     }
 
-    async beginImport(title: string): Promise<void> {
-        await this._db.importSessions.add({ title, startedAt: Date.now() });
+    async beginImport(title: string): Promise<boolean> {
+        return await this._db.transaction('rw', this._db.dictionaries, this._db.importSessions, async () => {
+            const [dictionary, importSession] = await Promise.all([
+                this._db.dictionaries.where('title').equals(title).first(),
+                this._db.importSessions.get(title),
+            ]);
+            if (dictionary !== undefined || importSession !== undefined) {
+                return false;
+            }
+            await this._db.importSessions.add({ title, startedAt: Date.now() });
+            return true;
+        });
     }
 
     async commitImport(title: string, summary: DictionaryImporter.Summary): Promise<void> {
