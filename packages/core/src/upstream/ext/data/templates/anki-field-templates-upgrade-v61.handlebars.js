@@ -1,0 +1,2 @@
+// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+export default "{{#*inline \"sentence-furigana-plain\"}}\n    {{~#if definition.cloze~}}\n        {{~#if (hasMedia \"textFuriganaPlain\" definition.cloze.sentence)~}}\n            {{{getMedia \"textFuriganaPlain\" definition.cloze.sentence escape=false}}}\n        {{~else~}}\n            {{{definition.cloze.sentence}}}\n        {{~/if~}}\n    {{~/if~}}\n{{/inline}}";

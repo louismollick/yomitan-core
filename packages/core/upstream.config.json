@@ -1,0 +1,83 @@
+{
+  "repository": "https://github.com/yomidevs/yomitan.git",
+  "commit": "67db60ddc2cbd7b5172d777c117e3201d7ddff0f",
+  "yomitanVersion": "26.9.8.0",
+  "roots": [
+    "ext/js/language/translator.js",
+    "ext/js/language/multi-language-transformer.js",
+    "ext/js/language/language-transformer.js",
+    "ext/js/language/languages.js",
+    "ext/js/language/text-utilities.js",
+    "ext/js/language/ja/japanese.js",
+    "ext/js/language/ja/japanese-wanakana.js",
+    "ext/js/dictionary/dictionary-importer.js",
+    "ext/js/dictionary/dictionary-data-util.js",
+    "ext/js/data/options-util.js",
+    "ext/js/data/json-schema.js",
+    "ext/js/data/anki-note-builder.js",
+    "ext/js/data/anki-note-data-creator.js",
+    "ext/js/data/anki-template-util.js",
+    "ext/js/data/anki-util.js",
+    "ext/js/templates/anki-template-renderer.js",
+    "ext/js/templates/template-renderer.js",
+    "ext/js/display/display-generator.js",
+    "ext/js/display/structured-content-generator.js",
+    "ext/js/display/pronunciation-generator.js",
+    "ext/js/dom/html-template-collection.js",
+    "ext/js/dom/css-style-applier.js",
+    "ext/js/media/audio-downloader.js",
+    "ext/js/comm/anki-connect.js",
+    "ext/js/general/regex-util.js",
+    "ext/js/general/cache-map.js"
+  ],
+  "exclude": [
+    "ext/js/dictionary/dictionary-database.js",
+    "ext/js/data/database.js"
+  ],
+  "domGlobals": [
+    "document",
+    "window",
+    "location",
+    "Node",
+    "NodeFilter",
+    "DOMParser",
+    "DocumentFragment",
+    "chrome"
+  ],
+  "assets": [
+    "ext/data/schemas/options-schema.json",
+    "ext/data/schemas/custom-audio-list-schema.json",
+    "ext/data/structured-content-style.json",
+    "ext/data/pronunciation-style.json",
+    "ext/data/recommended-dictionaries.json",
+    "ext/data/recommended-settings.json",
+    "ext/data/templates/*.handlebars",
+    "ext/templates-display.html"
+  ],
+  "rawFiles": [
+    "ext/data/schemas/*.json"
+  ],
+  "tests": [
+    "test/language/*.test.js",
+    "test/language-transformer-cycles.test.js",
+    "test/japanese-util.test.js",
+    "test/json-schema.test.js",
+    "test/options-util.test.js"
+  ],
+  "fixtures": {
+    "target": "../contract-tests/fixtures/upstream",
+    "paths": [
+      "test/data/translator-test-inputs.json",
+      "test/data/translator-test-results.json",
+      "test/data/translator-test-results-note-data1.json",
+      "test/data/anki-note-builder-test-results.json",
+      "test/data/database-test-cases.json",
+      "test/data/dictionaries",
+      "test/data/html/document-util.html"
+    ]
+  },
+  "rawCopies": [
+    "ext/data/templates/*.handlebars",
+    "test/data/templates"
+  ]
+}

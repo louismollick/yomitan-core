@@ -1,0 +1,2 @@
+// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+export default "{{<<<<<<<}}\n{{#*inline \"pitch-accent-item\"}}\n    {{~pronunciation format=format reading=reading downstepPosition=position nasalPositions=nasalPositions devoicePositions=devoicePositions~}}\n{{/inline}}\n{{=======}}\n{{#*inline \"pitch-accent-item\"}}\n    {{~pronunciation format=format reading=reading pitchPositions=positions nasalPositions=nasalPositions devoicePositions=devoicePositions~}}\n{{/inline}}\n{{>>>>>>>}}\n";

@@ -1,0 +1,2 @@
+// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+export default "{{<<<<<<<}}\n{{#*inline \"pitch-accent-graphs\"}}\n    {{~> pitch-accent-list format='graph'~}}\n{{/inline}}\n{{=======}}\n{{#*inline \"pitch-accent-graphs\"}}\n    {{~> pitch-accent-list format='graph'~}}\n{{/inline}}\n\n{{#*inline \"pitch-accent-graphs-jj\"}}\n    {{~> pitch-accent-list format='graph-jj'~}}\n{{/inline}}\n{{>>>>>>>}}";
