@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { upstreamAssets } from '../upstream/assets.js';
+
+type Fetch = (input: string, init?: object) => Promise<unknown>;
+
 /**
  * Browser and extension globals that vendored Yomitan modules reference. The sync script rewrites
  * those references to `upstreamEnv.<name>`, so the modules run unchanged against a real DOM in the
@@ -10,6 +14,7 @@
  * swaps the environment for the duration of one call.
  */
 export type UpstreamEnv = {
+    fetch: Fetch;
     document: unknown;
     window: unknown;
     location: { protocol: string; host: string };
@@ -39,7 +44,42 @@ const chromeShim = {
 /** Internal lookup links render as `yomitan://lookup/search.html?query=...`; renderers intercept them. */
 export const INTERNAL_LINK_LOCATION = { protocol: 'yomitan:', host: 'lookup' };
 
+let networkFetch: Fetch | undefined;
+
+/**
+ * Sets the `fetch` vendored modules use for network requests (AnkiConnect, audio sources). Defaults
+ * to the global `fetch`. One per JavaScript realm.
+ */
+export function setUpstreamFetch(fetch: Fetch | undefined): void {
+    networkFetch = fetch;
+}
+
+/**
+ * Upstream fetches its own data files (`/data/...`) with extension-relative URLs. Those resolve to
+ * the assets bundled by the sync script; every other request goes to the network fetch.
+ */
+async function upstreamFetch(input: string, init?: object): Promise<unknown> {
+    const load = typeof input === 'string' ? upstreamAssets[input] : undefined;
+    if (typeof load === 'function') {
+        const value = (await load()).default;
+        const text = typeof value === 'string' ? value : JSON.stringify(value);
+        return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: async () => text,
+            json: async () => JSON.parse(text),
+        };
+    }
+    const fetch = networkFetch ?? (globalThis as { fetch?: Fetch }).fetch;
+    if (fetch === undefined) {
+        throw new Error(`No fetch available for ${input}`);
+    }
+    return await fetch(input, init);
+}
+
 export const upstreamEnv: UpstreamEnv = {
+    fetch: upstreamFetch,
     document: undefined,
     window: undefined,
     location: INTERNAL_LINK_LOCATION,

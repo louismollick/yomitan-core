@@ -1,4 +1,5 @@
 // Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+import {upstreamEnv} from '../../../../platform/upstream-env.js';
 /*
  * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2021-2022  Yomichan Authors
@@ -114,7 +115,7 @@ export class CssStyleApplier {
      * @throws {Error} An error is thrown if the fetch fails.
      */
     async _fetchJsonAsset(url) {
-        const response = await fetch(url, {
+        const response = await upstreamEnv.fetch(url, {
             method: 'GET',
             mode: 'no-cors',
             cache: 'default',

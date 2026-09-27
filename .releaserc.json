@@ -15,7 +15,8 @@
     [
       "@semantic-release/npm",
       {
-        "npmPublish": true
+        "npmPublish": true,
+        "pkgRoot": "packages/core"
       }
     ],
     "@semantic-release/github",
@@ -23,7 +24,7 @@
       "@semantic-release/git",
       {
         "assets": [
-          "package.json",
+          "packages/core/package.json",
           "package-lock.json",
           "CHANGELOG.md"
         ],

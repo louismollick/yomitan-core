@@ -1,7 +1,5 @@
 // Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
 // @ts-nocheck
-
-// scripts/lib/linkedom.js
 var NodeFilter = {
   FILTER_ACCEPT: 1,
   FILTER_REJECT: 2,

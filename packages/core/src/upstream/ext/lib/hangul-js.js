@@ -26,9 +26,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/hangul-js/hangul.js
 var require_hangul = __commonJS({
-  "../../node_modules/hangul-js/hangul.js"(exports, module) {
+  "node_modules/hangul-js/hangul.js"(exports, module) {
     (function() {
       "use strict";
       var CHO = [
@@ -634,7 +633,6 @@ var require_hangul = __commonJS({
   }
 });
 
-// scripts/lib/hangul-js.js
 var Hangul = __toESM(require_hangul(), 1);
 export {
   Hangul

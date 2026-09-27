@@ -83,7 +83,10 @@ class MemoryBackend implements StorageBackend {
     }
 
     async getAllRows(store: ObjectStoreName): Promise<StoredRow[]> {
-        return [...this.getStore(store).rows].map(([id, value]) => ({ id, value: cloneValue(value) }));
+        // Primary key order, like IndexedDB (a put() can insert a key lower than existing ones).
+        return [...this.getStore(store).rows]
+            .sort((a, b) => a[0] - b[0])
+            .map(([id, value]) => ({ id, value: cloneValue(value) }));
     }
 
     async count(store: ObjectStoreName, index?: string, value?: string): Promise<number> {

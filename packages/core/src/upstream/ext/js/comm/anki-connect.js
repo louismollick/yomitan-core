@@ -1,4 +1,5 @@
 // Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+import {upstreamEnv} from '../../../../platform/upstream-env.js';
 /*
  * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2016-2022  Yomichan Authors
@@ -483,7 +484,7 @@ export class AnkiConnect {
         let response;
         try {
             if (this._server === null) { throw new Error('Server URL is null'); }
-            response = await fetch(this._server, {
+            response = await upstreamEnv.fetch(this._server, {
                 method: 'POST',
                 mode: 'cors',
                 cache: 'default',

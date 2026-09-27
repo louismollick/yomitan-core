@@ -6,7 +6,7 @@
  * chrome.runtime.getURL; here the same paths resolve to assets bundled by the sync script.
  */
 
-import { upstreamAssets } from '../../../assets.js';
+import {upstreamAssets} from '../../../assets.js';
 
 /**
  * @param {string} url

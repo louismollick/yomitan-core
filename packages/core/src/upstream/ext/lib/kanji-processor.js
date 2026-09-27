@@ -1,7 +1,5 @@
 // Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
 // @ts-nocheck
-
-// ../../node_modules/kanji-processor/dist/full_list.json
 var full_list_default = [
   {
     oyaji: "\u3FC9",
@@ -11213,7 +11211,6 @@ var full_list_default = [
   }
 ];
 
-// ../../node_modules/kanji-processor/dist/itaiji_list.json
 var itaiji_list_default = [
   "\u3FD7",
   "\u{273FE}",
@@ -13340,7 +13337,6 @@ var itaiji_list_default = [
   "\u993E"
 ];
 
-// ../../node_modules/kanji-processor/dist/index.js
 var KanjiProcessor = class {
   constructor() {
     this.mappings = full_list_default;

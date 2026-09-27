@@ -595,7 +595,7 @@ export class AudioDownloader {
      */
     async _getCustomAudioListSchema() {
         const url = upstreamEnv.chrome.runtime.getURL('/data/schemas/custom-audio-list-schema.json');
-        const response = await fetch(url, {
+        const response = await upstreamEnv.fetch(url, {
             ...DEFAULT_REQUEST_INIT_PARAMS,
             mode: 'no-cors',
         });

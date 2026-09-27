@@ -20,7 +20,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as acorn from 'acorn';
 import acornGlobals from 'acorn-globals';
+import * as acornWalk from 'acorn-walk';
 import Ajv from 'ajv';
 import standaloneCode from 'ajv/dist/standalone/index.js';
 import esbuild from 'esbuild';
@@ -35,11 +37,27 @@ const HEADER = '// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not ed
 
 function getUpstreamDir() {
     const flagIndex = process.argv.indexOf('--upstream-dir');
-    if (flagIndex >= 0) {
-        return path.resolve(process.argv[flagIndex + 1]);
+    const explicit = flagIndex >= 0 ? process.argv[flagIndex + 1] : process.env.YOMITAN_UPSTREAM_DIR;
+    if (explicit) {
+        return path.resolve(explicit);
     }
     const cacheDir = path.join(packageDir, '.upstream-cache', config.commit);
-    if (!fs.existsSync(path.join(cacheDir, '.git'))) {
+    const isComplete = () => {
+        try {
+            return (
+                execFileSync('git', ['rev-parse', 'HEAD'], {
+                    cwd: cacheDir,
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                }).trim() === config.commit
+            );
+        } catch {
+            return false;
+        }
+    };
+    if (!isComplete()) {
+        // A previous attempt may have failed half-way (for example on a network error): start over.
+        fs.rmSync(cacheDir, { recursive: true, force: true });
         fs.mkdirSync(cacheDir, { recursive: true });
         execFileSync('git', ['init', '-q'], { cwd: cacheDir });
         execFileSync('git', ['remote', 'add', 'origin', config.repository], { cwd: cacheDir });
@@ -125,15 +143,28 @@ for (const file of [...jsFiles].sort()) {
         continue;
     }
     let source = fs.readFileSync(path.join(upstreamDir, file), 'utf8');
-    const references = acornGlobals(source, { ecmaVersion: 'latest', sourceType: 'module' }).filter(({ name }) =>
-        domGlobals.has(name),
-    );
+    const parseOptions = { ecmaVersion: 'latest', sourceType: 'module' };
+    const references = acornGlobals(source, parseOptions).filter(({ name }) => domGlobals.has(name));
     if (references.length > 0) {
+        // `{document}` must become `{document: upstreamEnv.document}`, not `{upstreamEnv.document}`.
+        const shorthandValues = new Set();
+        acornWalk.simple(acorn.parse(source, parseOptions), {
+            Property(node) {
+                if (node.shorthand) {
+                    shorthandValues.add(node.value.start);
+                }
+            },
+        });
         const edits = [];
         for (const { name, nodes } of references) {
             (routed[file] ??= []).push(name);
             for (const node of nodes) {
-                edits.push({ start: node.start, end: node.end, text: `upstreamEnv.${name}` });
+                const replacement = `upstreamEnv.${name}`;
+                edits.push({
+                    start: node.start,
+                    end: node.end,
+                    text: shorthandValues.has(node.start) ? `${name}: ${replacement}` : replacement,
+                });
             }
         }
         edits.sort((a, b) => b.start - a.start);
@@ -142,6 +173,7 @@ for (const file of [...jsFiles].sort()) {
         }
         const envImport = toPosix(path.relative(path.dirname(target), envModulePath));
         source = `import {upstreamEnv} from '${envImport.startsWith('.') ? envImport : `./${envImport}`}';\n${source}`;
+        acorn.parse(source, parseOptions); // The rewrite must still parse.
     }
     fs.writeFileSync(target, HEADER + source);
 }
@@ -204,9 +236,14 @@ const emptyNodeBuiltins = {
         build.onLoad({ filter: /.*/, namespace: 'empty' }, () => ({ contents: 'export default {};', loader: 'js' }));
     },
 };
-for (const [lib, entry] of Object.entries(libEntries)) {
-    await esbuild.build({
+/**
+ * Bundles a lib reproducibly: esbuild's per-module path comments depend on where npm hoisted each
+ * package, so they are dropped, and paths are resolved from this package.
+ */
+async function buildLib(entry, outfile, options = {}) {
+    const result = await esbuild.build({
         plugins: [emptyNodeBuiltins],
+        absWorkingDir: packageDir,
         entryPoints: [entry],
         bundle: true,
         minify: false,
@@ -214,10 +251,22 @@ for (const [lib, entry] of Object.entries(libEntries)) {
         format: 'esm',
         platform: 'neutral',
         mainFields: ['module', 'main'],
-        outfile: path.join(outDir, lib),
-        banner: { js: `${HEADER}// @ts-nocheck` },
+        write: false,
         logLevel: 'warning',
+        ...options,
     });
+    const code = result.outputFiles[0].text
+        .split('\n')
+        .filter((line) => !/^\s*\/\/ (?:\.\.\/)*(?:node_modules|scripts)\//.test(line))
+        .join('\n')
+        // CommonJS wrapper keys embed module paths; make them independent of hoisting.
+        .replace(/(?:\.\.\/)+node_modules\//g, 'node_modules/');
+    fs.mkdirSync(path.dirname(outfile), { recursive: true });
+    fs.writeFileSync(outfile, `${HEADER}// @ts-nocheck\n${code}`);
+}
+
+for (const [lib, entry] of Object.entries(libEntries)) {
+    await buildLib(entry, path.join(outDir, lib));
 }
 const schemaFiles = config.rawFiles.flatMap(expandGlob);
 const ajv = new Ajv({
@@ -230,15 +279,7 @@ fs.writeFileSync(
     path.join(libDir, 'validate-schemas.js'),
     `${HEADER}// @ts-nocheck\nimport {ucs2length} from './ucs2length.js';\n${validators}`,
 );
-await esbuild.build({
-    entryPoints: [path.join(packageDir, 'scripts', 'lib', 'ucs2length.js')],
-    bundle: true,
-    format: 'esm',
-    platform: 'neutral',
-    outfile: path.join(libDir, 'ucs2length.js'),
-    banner: { js: `${HEADER}// @ts-nocheck` },
-    logLevel: 'warning',
-});
+await buildLib(path.join(packageDir, 'scripts', 'lib', 'ucs2length.js'), path.join(libDir, 'ucs2length.js'));
 
 // 5b. Upstream tests, copied verbatim next to the vendored ext/ so their relative imports resolve.
 const testFiles = new Set();

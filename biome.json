@@ -47,7 +47,9 @@
             "**/.upstream-cache/**",
             "**/fixtures/upstream/**",
             "**/generated/**",
-            "**/test/hermes/react-native-prelude.js"
+            "**/test/hermes/react-native-prelude.js",
+            "**/src/upstream-overrides/**",
+            "**/scripts/lib/**"
         ]
     }
 }

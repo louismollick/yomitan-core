@@ -42,7 +42,8 @@
     "NodeFilter",
     "DOMParser",
     "DocumentFragment",
-    "chrome"
+    "chrome",
+    "fetch"
   ],
   "assets": [
     "ext/data/schemas/options-schema.json",

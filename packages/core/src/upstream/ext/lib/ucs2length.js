@@ -26,9 +26,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "../../node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length3(str) {
@@ -52,7 +51,6 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// scripts/lib/ucs2length.js
 var import_ucs2length = __toESM(require_ucs2length(), 1);
 var ucs2length2 = import_ucs2length.default.default;
 export {

@@ -92,7 +92,7 @@ export class RequestBuilder {
 
             await this._updateSessionRules({addRules});
             try {
-                return await fetch(url, init);
+                return await upstreamEnv.fetch(url, init);
             } finally {
                 await this._tryUpdateSessionRules({removeRuleIds: [id]});
             }

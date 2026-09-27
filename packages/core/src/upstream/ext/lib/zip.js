@@ -1,7 +1,5 @@
 // Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
 // @ts-nocheck
-
-// node_modules/@zip.js/zip.js/lib/core/streams/codecs/inflate.js
 var MAX_BITS = 15;
 var Z_OK = 0;
 var Z_STREAM_END = 1;
@@ -3458,7 +3456,6 @@ function ZipInflate(options) {
   };
 }
 
-// node_modules/@zip.js/zip.js/lib/core/constants.js
 var MAX_32_BITS = 4294967295;
 var MAX_16_BITS = 65535;
 var COMPRESSION_METHOD_DEFLATE = 8;
@@ -3494,7 +3491,6 @@ var UNDEFINED_VALUE = void 0;
 var UNDEFINED_TYPE = "undefined";
 var FUNCTION_TYPE = "function";
 
-// node_modules/@zip.js/zip.js/lib/core/streams/stream-adapter.js
 var StreamAdapter = class {
   constructor(Codec) {
     return class extends TransformStream {
@@ -3516,7 +3512,6 @@ var StreamAdapter = class {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/configuration.js
 var MINIMUM_CHUNK_SIZE = 64;
 var maxWorkers = 2;
 try {
@@ -3597,12 +3592,10 @@ function setIfDefined(propertyName, propertyValue) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/util/default-mime-type.js
 function getMimeType() {
   return "application/octet-stream";
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/codecs/crc32.js
 var table = [];
 for (let i = 0; i < 256; i++) {
   let t = i;
@@ -3631,7 +3624,6 @@ var Crc32 = class {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/streams/crc32-stream.js
 var Crc32Stream = class extends TransformStream {
   constructor() {
     let stream;
@@ -3652,7 +3644,6 @@ var Crc32Stream = class extends TransformStream {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/util/encode-text.js
 function encodeText(value) {
   if (typeof TextEncoder == UNDEFINED_TYPE) {
     value = unescape(encodeURIComponent(value));
@@ -3666,7 +3657,6 @@ function encodeText(value) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/codecs/sjcl.js
 var bitArray = {
   /**
    * Concatenate two bit arrays.
@@ -4238,7 +4228,6 @@ misc.hmacSha1 = class {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/streams/common-crypto.js
 var GET_RANDOM_VALUES_SUPPORTED = typeof crypto != UNDEFINED_TYPE && typeof crypto.getRandomValues == FUNCTION_TYPE;
 var ERR_INVALID_PASSWORD = "Invalid password";
 var ERR_INVALID_SIGNATURE = "Invalid signature";
@@ -4251,7 +4240,6 @@ function getRandomValues(array) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/aes-crypto-stream.js
 var BLOCK_LENGTH = 16;
 var RAW_FORMAT = "raw";
 var PBKDF2_ALGORITHM = { name: "PBKDF2" };
@@ -4509,7 +4497,6 @@ function toBits(codecBytes2, chunk) {
   return codecBytes2.toBits(chunk);
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/zip-crypto-stream.js
 var HEADER_LENGTH = 12;
 var ZipCryptoDecryptionStream = class extends TransformStream {
   constructor({ password, passwordVerification, checkPasswordOnly }) {
@@ -4618,7 +4605,6 @@ function getInt32(number) {
   return number & 4294967295;
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/zip-entry-stream.js
 var COMPRESSION_FORMAT = "deflate-raw";
 var DeflateStream = class extends TransformStream {
   constructor(options, { chunkSize, CompressionStream: CompressionStream2, CompressionStreamNative }) {
@@ -4723,7 +4709,6 @@ function pipeThrough(readable, transformStream) {
   return readable.pipeThrough(transformStream);
 }
 
-// node_modules/@zip.js/zip.js/lib/core/streams/codec-stream.js
 var MESSAGE_EVENT_TYPE = "message";
 var MESSAGE_START = "start";
 var MESSAGE_PULL = "pull";
@@ -4812,7 +4797,6 @@ var ChunkStream = class extends TransformStream {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/codec-worker.js
 var WEB_WORKERS_SUPPORTED = typeof Worker != UNDEFINED_TYPE;
 var CodecWorker = class {
   constructor(workerData, { readable, writable }, { options, config: config2, streamOptions, useWebWorkers, transferStreams, scripts }, onTaskFinished) {
@@ -5092,7 +5076,6 @@ async function onMessage({ data }, workerData) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/codec-pool.js
 var pool = [];
 var pendingRequests = [];
 var indexWorker = 0;
@@ -5163,7 +5146,6 @@ async function terminateWorkers() {
   }));
 }
 
-// node_modules/@zip.js/zip.js/lib/core/io.js
 var ERR_HTTP_STATUS = "HTTP error ";
 var ERR_HTTP_RANGE = "HTTP Range not supported";
 var ERR_ITERATOR_COMPLETED_TOO_SOON = "Writer iterator completed too soon";
@@ -5772,7 +5754,6 @@ function readUint8Array(reader, offset, size, diskNumber) {
 var SplitZipReader = SplitDataReader;
 var SplitZipWriter = SplitDataWriter;
 
-// node_modules/@zip.js/zip.js/lib/core/util/cp437-decode.js
 var CP437 = "\0\u263A\u263B\u2665\u2666\u2663\u2660\u2022\u25D8\u25CB\u25D9\u2642\u2640\u266A\u266B\u263C\u25BA\u25C4\u2195\u203C\xB6\xA7\u25AC\u21A8\u2191\u2193\u2192\u2190\u221F\u2194\u25B2\u25BC !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u2302\xC7\xFC\xE9\xE2\xE4\xE0\xE5\xE7\xEA\xEB\xE8\xEF\xEE\xEC\xC4\xC5\xC9\xE6\xC6\xF4\xF6\xF2\xFB\xF9\xFF\xD6\xDC\xA2\xA3\xA5\u20A7\u0192\xE1\xED\xF3\xFA\xF1\xD1\xAA\xBA\xBF\u2310\xAC\xBD\xBC\xA1\xAB\xBB\u2591\u2592\u2593\u2502\u2524\u2561\u2562\u2556\u2555\u2563\u2551\u2557\u255D\u255C\u255B\u2510\u2514\u2534\u252C\u251C\u2500\u253C\u255E\u255F\u255A\u2554\u2569\u2566\u2560\u2550\u256C\u2567\u2568\u2564\u2565\u2559\u2558\u2552\u2553\u256B\u256A\u2518\u250C\u2588\u2584\u258C\u2590\u2580\u03B1\xDF\u0393\u03C0\u03A3\u03C3\xB5\u03C4\u03A6\u0398\u03A9\u03B4\u221E\u03C6\u03B5\u2229\u2261\xB1\u2265\u2264\u2320\u2321\xF7\u2248\xB0\u2219\xB7\u221A\u207F\xB2\u25A0 ".split("");
 var VALID_CP437 = CP437.length == 256;
 function decodeCP437(stringValue) {
@@ -5787,7 +5768,6 @@ function decodeCP437(stringValue) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/util/decode-text.js
 function decodeText(value, encoding) {
   if (encoding && encoding.trim().toLowerCase() == "cp437") {
     return decodeCP437(value);
@@ -5796,7 +5776,6 @@ function decodeText(value, encoding) {
   }
 }
 
-// node_modules/@zip.js/zip.js/lib/core/zip-entry.js
 var PROPERTY_NAME_FILENAME = "filename";
 var PROPERTY_NAME_RAW_FILENAME = "rawFilename";
 var PROPERTY_NAME_COMMENT = "comment";
@@ -5862,7 +5841,6 @@ var Entry = class {
   }
 };
 
-// node_modules/@zip.js/zip.js/lib/core/zip-reader.js
 var ERR_BAD_FORMAT = "File format is not recognized";
 var ERR_EOCDR_NOT_FOUND = "End of central directory not found";
 var ERR_EOCDR_LOCATOR_ZIP64_NOT_FOUND = "End of Zip64 central directory locator not found";
@@ -6473,10 +6451,8 @@ function getDataView(array) {
   return new DataView(array.buffer);
 }
 
-// node_modules/@zip.js/zip.js/lib/zip-no-worker-inflate.js
 configure({ Inflate: ZipInflate });
 
-// scripts/lib/zip.js
 function configure2(options) {
   configure({ ...options, workerScripts: void 0, useWebWorkers: false });
 }

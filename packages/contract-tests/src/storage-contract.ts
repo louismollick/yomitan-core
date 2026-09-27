@@ -61,9 +61,24 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
         test('rejects use before prepare and double prepare', async ({ expect }) => {
             const storage = await createStorage();
             const archive = await createDictionaryArchive('valid-dictionary1');
-            const titles = new Map([['Test Dictionary', { alias: 'Test Dictionary', allowSecondarySearches: false }]]);
-            await expect.soft(storage.findTermsBulk(['?'], titles, 'exact')).rejects.toThrow('Database not open');
-            await expect.soft(storage.getDictionaryInfo()).rejects.toThrow('Database not open');
+            const title = 'Test Dictionary';
+            const titles = new Map([[title, { alias: title, allowSecondarySearches: false }]]);
+            const importDetails = { prefixWildcardsSupported: false, yomitanVersion: '0.0.0.0' };
+            const notOpen = 'Database not open';
+            await expect.soft(storage.deleteDictionary(title, 1000, () => {})).rejects.toThrow(notOpen);
+            await expect.soft(storage.findTermsBulk(['?'], titles, 'exact')).rejects.toThrow(notOpen);
+            await expect
+                .soft(storage.findTermsExactBulk([{ term: '?', reading: '?' }], titles))
+                .rejects.toThrow(notOpen);
+            await expect
+                .soft(storage.findTermsBySequenceBulk([{ query: 1, dictionary: title }]))
+                .rejects.toThrow(notOpen);
+            await expect.soft(storage.findTermMetaBulk(['?'], titles)).rejects.toThrow(notOpen);
+            await expect.soft(storage.findKanjiBulk(['?'], titles)).rejects.toThrow(notOpen);
+            await expect.soft(storage.findKanjiMetaBulk(['?'], titles)).rejects.toThrow(notOpen);
+            await expect.soft(storage.findTagForTitle('tag', title)).rejects.toThrow(notOpen);
+            await expect.soft(storage.getDictionaryInfo()).rejects.toThrow(notOpen);
+            await expect.soft(storage.getDictionaryCounts([title], true)).rejects.toThrow(notOpen);
             await expect
                 .soft(new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, importDetails))
                 .rejects.toThrow('Database is not ready');
@@ -76,6 +91,29 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
                     result: null,
                     errors: [new Error('Dictionary Test Dictionary is already imported, skipped it.')],
                 });
+            await storage.close();
+        });
+
+        test('close rejects when not open, and waits for an open in progress', async ({ expect }) => {
+            const storage = await createStorage();
+            await expect(storage.close()).rejects.toThrow('Database is not open');
+            const opening = storage.prepare();
+            await storage.close();
+            await opening;
+            expect(storage.isPrepared()).toBe(false);
+        });
+
+        test('returns dictionary summaries in primary key order', async ({ expect }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            await storage.addWithResult('dictionaries', { title: 'B', version: 3 });
+            await storage.bulkUpdate(
+                'dictionaries',
+                [{ primaryKey: 0, data: { title: 'A', version: 3 } as never }],
+                0,
+                1,
+            );
+            expect((await storage.getDictionaryInfo()).map(({ title }) => title)).toEqual(['A', 'B']);
             await storage.close();
         });
 

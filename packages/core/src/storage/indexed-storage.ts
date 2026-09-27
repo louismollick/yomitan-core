@@ -58,28 +58,32 @@ class CompletedRequest {
 export class IndexedDictionaryStorage implements DictionaryStorage {
     private readonly backend: StorageBackend;
     private open = false;
-    private opening = false;
+    private opening: Promise<void> | null = null;
 
     constructor(backend: StorageBackend) {
         this.backend = backend;
     }
 
     async prepare(): Promise<void> {
-        if (this.open || this.opening) {
-            throw new Error('Database already open');
+        if (this.open || this.opening !== null) {
+            throw new Error(this.open ? 'Database already open' : 'Already opening');
         }
-        this.opening = true;
+        this.opening = this.backend.open();
         try {
-            await this.backend.open();
+            await this.opening;
             this.open = true;
         } finally {
-            this.opening = false;
+            this.opening = null;
         }
     }
 
+    /** Like upstream: rejects if the database is not open. Waits for an open that is in progress. */
     async close(): Promise<void> {
+        if (this.opening !== null) {
+            await this.opening.catch(() => {});
+        }
         if (!this.open) {
-            return;
+            throw new Error('Database is not open');
         }
         this.open = false;
         await this.backend.close();
@@ -90,7 +94,7 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
     }
 
     async purge(): Promise<boolean> {
-        if (this.opening) {
+        if (this.opening !== null) {
             throw new Error('Cannot purge database while opening');
         }
         if (!this.open) {
@@ -254,8 +258,11 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
     }
 
     async findTagMetaBulk(items: DDB.DictionaryAndQueryRequest[]): Promise<(DDB.Tag | undefined)[]> {
-        this.assertOpen();
         const results: (DDB.Tag | undefined)[] = new Array(items.length);
+        if (items.length === 0) {
+            return results;
+        }
+        this.assertOpen();
         await Promise.all(
             items.map(async (item, i) => {
                 const rows = await this.backend.getAll('tagMeta', 'name', { kind: 'only', value: item.query });
@@ -321,11 +328,11 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
     }
 
     async bulkAdd(objectStoreName: ObjectStoreName, items: unknown[], start: number, count: number): Promise<void> {
-        this.assertOpen();
         const end = Math.min(start + count, items.length);
         if (start >= end) {
             return;
         }
+        this.assertOpen();
         await this.backend.add(objectStoreName, items.slice(start, end) as Record<string, unknown>[]);
     }
 
@@ -341,8 +348,11 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         start: number,
         count: number,
     ): Promise<void> {
-        this.assertOpen();
         const end = Math.min(start + count, items.length);
+        if (start >= end) {
+            return;
+        }
+        this.assertOpen();
         for (let i = start; i < end; ++i) {
             const { primaryKey, data } = items[i];
             await this.backend.put(objectStoreName, primaryKey as number, data as unknown as Record<string, unknown>);
@@ -351,7 +361,7 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
 
     private assertOpen(): void {
         if (!this.open) {
-            throw new Error('Database not open');
+            throw new Error(this.opening !== null ? 'Database not ready' : 'Database not open');
         }
     }
 
@@ -363,11 +373,11 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         predicate: (row: Record<string, unknown>, item: TItem) => boolean,
         createResult: (row: Record<string, unknown>, data: FindMultiBulkData<TItem>) => TResult,
     ): Promise<TResult[]> {
-        this.assertOpen();
         const results: TResult[] = [];
         if (items.length === 0 || indexNames.length === 0) {
             return results;
         }
+        this.assertOpen();
         // Issue every request first, then consume them in request order, as upstream's single
         // IndexedDB transaction does.
         const requests: Promise<StoredRow[]>[] = [];
