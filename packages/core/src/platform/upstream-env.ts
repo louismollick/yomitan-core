@@ -17,7 +17,7 @@ export type UpstreamEnv = {
     fetch: Fetch;
     document: unknown;
     window: unknown;
-    location: { protocol: string; host: string };
+    location: { protocol: string; host: string; href: string };
     Node: unknown;
     NodeFilter: unknown;
     DOMParser: unknown;
@@ -42,13 +42,14 @@ const chromeShim = {
 };
 
 /** Internal lookup links render as `yomitan://lookup/search.html?query=...`; renderers intercept them. */
-export const INTERNAL_LINK_LOCATION = { protocol: 'yomitan:', host: 'lookup' };
+export const INTERNAL_LINK_LOCATION = { protocol: 'yomitan:', host: 'lookup', href: 'yomitan://lookup/search.html' };
 
 let networkFetch: Fetch | undefined;
 
 /**
- * Sets the `fetch` vendored modules use for network requests (AnkiConnect, audio sources). Defaults
- * to the global `fetch`. One per JavaScript realm.
+ * Sets the `fetch` vendored modules use for network requests (AnkiConnect, custom audio lists).
+ * Defaults to the global `fetch`. One per JavaScript realm. Upstream's audio downloads go through
+ * its extension-only `RequestBuilder` and are wired separately (roadmap: audio).
  */
 export function setUpstreamFetch(fetch: Fetch | undefined): void {
     networkFetch = fetch;

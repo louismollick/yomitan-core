@@ -80,5 +80,19 @@
   "rawCopies": [
     "ext/data/templates/*.handlebars",
     "test/data/templates"
+  ],
+  "typePatches": [
+    {
+      "file": "types/ext/dictionary-importer.d.ts",
+      "find": "    [total: string]: number;\n    [key: string]: number;",
+      "replace": "    [key: string]: number;",
+      "reason": "Duplicate index signature (TS2374)."
+    },
+    {
+      "file": "types/ext/dictionary-database.d.ts",
+      "find": "export type DatabaseUpdateItem = {\n    primaryKey: IDBValidKey;\n    data: ObjectStoreData<T>;\n};",
+      "replace": "export type DatabaseUpdateItem<T extends ObjectStoreName = ObjectStoreName> = {\n    primaryKey: number;\n    data: ObjectStoreData<T>;\n};",
+      "reason": "Unbound type parameter (TS2304); IDBValidKey needs the DOM lib, and every store uses numeric keys."
+    }
   ]
 }

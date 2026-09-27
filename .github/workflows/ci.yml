@@ -33,7 +33,12 @@ jobs:
       - name: Check vendored upstream is in sync
         run: |
           npm run sync-upstream
-          git diff --exit-code -- packages/core/src/upstream packages/contract-tests/fixtures
+          changes="$(git status --porcelain --untracked-files=all -- packages/core/src/upstream packages/contract-tests/fixtures)"
+          if [ -n "$changes" ]; then
+            echo "Vendored upstream is out of sync with upstream.config.json:"
+            echo "$changes"
+            exit 1
+          fi
 
       - name: Verify
         env:

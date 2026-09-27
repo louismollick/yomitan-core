@@ -59,6 +59,7 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
     private readonly backend: StorageBackend;
     private open = false;
     private opening: Promise<void> | null = null;
+    private lifecycle: Promise<void> = Promise.resolve();
 
     constructor(backend: StorageBackend) {
         this.backend = backend;
@@ -68,16 +69,24 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         if (this.open || this.opening !== null) {
             throw new Error(this.open ? 'Database already open' : 'Already opening');
         }
-        this.opening = this.backend.open();
-        try {
-            await this.opening;
+        const opening = this.runLifecycle(async () => {
+            await this.backend.open();
             this.open = true;
+        });
+        this.opening = opening;
+        try {
+            await opening;
         } finally {
-            this.opening = null;
+            if (this.opening === opening) {
+                this.opening = null;
+            }
         }
     }
 
-    /** Like upstream: rejects if the database is not open. Waits for an open that is in progress. */
+    /**
+     * Like upstream: rejects if the database is not open. Waits for an open that is in progress, and a
+     * later `prepare()` waits for this close to finish.
+     */
     async close(): Promise<void> {
         if (this.opening !== null) {
             await this.opening.catch(() => {});
@@ -86,7 +95,14 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
             throw new Error('Database is not open');
         }
         this.open = false;
-        await this.backend.close();
+        await this.runLifecycle(() => this.backend.close());
+    }
+
+    /** Opens and closes run one at a time, in call order. */
+    private runLifecycle(operation: () => Promise<void>): Promise<void> {
+        const result = this.lifecycle.then(operation);
+        this.lifecycle = result.catch(() => {});
+        return result;
     }
 
     isPrepared(): boolean {

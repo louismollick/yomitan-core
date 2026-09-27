@@ -154,6 +154,10 @@ class MemoryBackend implements StorageBackend {
                     ids.push(id);
                 }
             }
+            // Equal keys are ordered by primary key, as in IndexedDB (a put() can insert a lower key).
+            for (const ids of map.values()) {
+                ids.sort((a, b) => a - b);
+            }
             store.indexes.set(index, map);
         }
         return map;

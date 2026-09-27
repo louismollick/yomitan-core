@@ -213,8 +213,8 @@ export type ObjectStoreData<T extends ObjectStoreName> = (
     never
 );
 
-export type DatabaseUpdateItem = {
-    primaryKey: IDBValidKey;
+export type DatabaseUpdateItem<T extends ObjectStoreName = ObjectStoreName> = {
+    primaryKey: number;
     data: ObjectStoreData<T>;
 };
 

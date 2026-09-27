@@ -28,7 +28,7 @@
   "scripts": {
     "sync-upstream": "node scripts/sync-upstream.mjs",
     "build": "tsdown",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p test/consumer-types",
     "test": "vitest run",
     "prepublishOnly": "npm run build"
   },

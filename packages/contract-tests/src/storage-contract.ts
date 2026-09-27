@@ -103,6 +103,37 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             expect(storage.isPrepared()).toBe(false);
         });
 
+        test('orders equal index keys by primary key', async ({ expect }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            const term = (glossary: string) => ({
+                expression: '打つ',
+                reading: 'うつ',
+                definitionTags: '',
+                rules: '',
+                score: 0,
+                glossary: [glossary],
+                dictionary: 'D',
+            });
+            await storage.addWithResult('terms', term('second'));
+            await storage.bulkUpdate('terms', [{ primaryKey: 0, data: term('first') as never }], 0, 1);
+            const results = await storage.findTermsBulk(['打つ'], new Set(['D']), 'exact');
+            expect(results.map(({ definitions }) => definitions[0])).toEqual(['first', 'second']);
+            await storage.close();
+        });
+
+        test('a prepare() issued during close() opens after the close finishes', async ({ expect }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            const closing = storage.close();
+            const reopening = storage.prepare();
+            await closing;
+            await reopening;
+            expect(storage.isPrepared()).toBe(true);
+            expect(await storage.getDictionaryInfo()).toEqual([]);
+            await storage.close();
+        });
+
         test('returns dictionary summaries in primary key order', async ({ expect }) => {
             const storage = await createStorage();
             await storage.prepare();
