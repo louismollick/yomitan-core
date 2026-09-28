@@ -282,6 +282,8 @@ Each slice is its own PR, with its own fixtures green and a stated pass count in
   - The two-process recovery test passes.
 
 **1d. Client, profile and lookup semantics (M)**
+
+> **Implementation note.** Audio source URL resolution moved to the audio fast follow (roadmap P0 #1): upstream's `AudioDownloader` builds requests through its extension-only `RequestBuilder`, so URL resolution and download are wired together there.
 - `createYomitan` with the `profile`, `dictionaries` and `lookup` namespaces.
 - `options-util` migration with bundled template patches.
 - Yomitan settings import.

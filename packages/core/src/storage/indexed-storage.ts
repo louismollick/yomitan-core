@@ -16,10 +16,8 @@ import type {
     StorageBackend,
     StoredRow,
     Summary,
+    WriteGuard,
 } from './types';
-
-/** The upper bound upstream appends for prefix ranges (`${item}￿`). */
-const RANGE_SUFFIX = '￿';
 
 const DICTIONARY_STORES: ObjectStoreName[] = ['kanji', 'kanjiMeta', 'terms', 'termMeta', 'tagMeta', 'media'];
 
@@ -57,28 +55,38 @@ class CompletedRequest {
 
 export class IndexedDictionaryStorage implements DictionaryStorage {
     private readonly backend: StorageBackend;
-    private open = false;
-    private opening: Promise<void> | null = null;
-    private lifecycle: Promise<void> = Promise.resolve();
+    private readonly writeGuard: WriteGuard | undefined;
+    /** Shared with guarded views, so opening or closing either affects both. */
+    private readonly state: { open: boolean; opening: Promise<void> | null; lifecycle: Promise<void> };
 
-    constructor(backend: StorageBackend) {
+    constructor(backend: StorageBackend, writeGuard?: WriteGuard, state?: IndexedDictionaryStorage['state']) {
         this.backend = backend;
+        this.writeGuard = writeGuard;
+        this.state = state ?? { open: false, opening: null, lifecycle: Promise.resolve() };
+    }
+
+    /**
+     * A view of this storage whose writes (`bulkAdd`, `addWithResult`, `bulkUpdate`) first run
+     * `guard` in the same transaction. Given to the importer for one write session.
+     */
+    withWriteGuard(guard: WriteGuard): IndexedDictionaryStorage {
+        return new IndexedDictionaryStorage(this.backend, guard, this.state);
     }
 
     async prepare(): Promise<void> {
-        if (this.open || this.opening !== null) {
-            throw new Error(this.open ? 'Database already open' : 'Already opening');
+        if (this.state.open || this.state.opening !== null) {
+            throw new Error(this.state.open ? 'Database already open' : 'Already opening');
         }
         const opening = this.runLifecycle(async () => {
             await this.backend.open();
-            this.open = true;
+            this.state.open = true;
         });
-        this.opening = opening;
+        this.state.opening = opening;
         try {
             await opening;
         } finally {
-            if (this.opening === opening) {
-                this.opening = null;
+            if (this.state.opening === opening) {
+                this.state.opening = null;
             }
         }
     }
@@ -88,32 +96,32 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
      * later `prepare()` waits for this close to finish.
      */
     async close(): Promise<void> {
-        if (this.opening !== null) {
-            await this.opening.catch(() => {});
+        if (this.state.opening !== null) {
+            await this.state.opening.catch(() => {});
         }
-        if (!this.open) {
+        if (!this.state.open) {
             throw new Error('Database is not open');
         }
-        this.open = false;
+        this.state.open = false;
         await this.runLifecycle(() => this.backend.close());
     }
 
     /** Opens and closes run one at a time, in call order. */
     private runLifecycle(operation: () => Promise<void>): Promise<void> {
-        const result = this.lifecycle.then(operation);
-        this.lifecycle = result.catch(() => {});
+        const result = this.state.lifecycle.then(operation);
+        this.state.lifecycle = result.catch(() => {});
         return result;
     }
 
     isPrepared(): boolean {
-        return this.open;
+        return this.state.open;
     }
 
     async purge(): Promise<boolean> {
-        if (this.opening !== null) {
+        if (this.state.opening !== null) {
             throw new Error('Cannot purge database while opening');
         }
-        if (!this.open) {
+        if (!this.state.open) {
             await this.prepare();
         }
         await this.backend.clear();
@@ -176,11 +184,9 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         const createQuery = (item: string): KeyRange => {
             switch (matchType) {
                 case 'prefix':
-                    return { kind: 'bound', lower: item, upper: `${item}${RANGE_SUFFIX}` };
-                case 'suffix': {
-                    const reversed = stringReverse(item);
-                    return { kind: 'bound', lower: reversed, upper: `${reversed}${RANGE_SUFFIX}` };
-                }
+                    return { kind: 'prefix', value: item };
+                case 'suffix':
+                    return { kind: 'prefix', value: stringReverse(item) };
                 default:
                     return { kind: 'only', value: item };
             }
@@ -349,12 +355,12 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
             return;
         }
         this.assertOpen();
-        await this.backend.add(objectStoreName, items.slice(start, end) as Record<string, unknown>[]);
+        await this.backend.add(objectStoreName, items.slice(start, end) as Record<string, unknown>[], this.writeGuard);
     }
 
     async addWithResult(objectStoreName: ObjectStoreName, item: unknown): Promise<unknown> {
         this.assertOpen();
-        const [id] = await this.backend.add(objectStoreName, [item as Record<string, unknown>]);
+        const [id] = await this.backend.add(objectStoreName, [item as Record<string, unknown>], this.writeGuard);
         return new CompletedRequest(id);
     }
 
@@ -371,13 +377,18 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         this.assertOpen();
         for (let i = start; i < end; ++i) {
             const { primaryKey, data } = items[i];
-            await this.backend.put(objectStoreName, primaryKey as number, data as unknown as Record<string, unknown>);
+            await this.backend.put(
+                objectStoreName,
+                primaryKey as number,
+                data as unknown as Record<string, unknown>,
+                this.writeGuard,
+            );
         }
     }
 
     private assertOpen(): void {
-        if (!this.open) {
-            throw new Error(this.opening !== null ? 'Database not ready' : 'Database not open');
+        if (!this.state.open) {
+            throw new Error(this.state.opening !== null ? 'Database not ready' : 'Database not open');
         }
     }
 

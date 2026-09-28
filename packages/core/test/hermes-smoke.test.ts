@@ -24,13 +24,9 @@ import { build } from 'esbuild';
 import { describe, expect, test } from 'vitest';
 import {
     TRANSLATOR_FIXTURE_DICTIONARY,
-    createDictionaryArchive,
+    readFixtureDictionaryFiles,
     readUpstreamJson,
-    testMediaLoader,
 } from '../../contract-tests/src/index';
-import { createMemoryStorage } from '../src/storage/memory-storage';
-import type { ObjectStoreName } from '../src/storage/types';
-import { DictionaryImporter } from '../src/upstream/ext/js/dictionary/dictionary-importer.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const hermesBin = process.env.HERMES_BIN ?? join(homedir(), '.jsvu', 'bin', 'hermes');
@@ -42,31 +38,19 @@ const hermescBin = join(
     process.platform === 'win32' ? 'hermesc.exe' : 'hermesc',
 );
 
-async function createSmokeInput() {
-    const storage = createMemoryStorage();
-    await storage.prepare();
-    const archive = await createDictionaryArchive('valid-dictionary1', {
-        title: TRANSLATOR_FIXTURE_DICTIONARY,
-        level: 6,
-    });
-    const { errors } = await new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, {
-        prefixWildcardsSupported: true,
-        yomitanVersion: '0.0.0.0',
-    });
-    expect(errors).toEqual([]);
-    const backend = (
-        storage as unknown as {
-            backend: { getAllRows(store: ObjectStoreName): Promise<{ value: Record<string, unknown> }[]> };
+function createSmokeInput() {
+    const files: Record<string, string | number[]> = {};
+    for (const [name, content] of Object.entries(readFixtureDictionaryFiles('valid-dictionary1'))) {
+        if (name === 'index.json') {
+            files[name] = JSON.stringify({ ...JSON.parse(content as string), title: TRANSLATOR_FIXTURE_DICTIONARY });
+        } else {
+            files[name] = typeof content === 'string' ? content : [...content];
         }
-    ).backend;
-    const rows: Record<string, Record<string, unknown>[]> = {};
-    for (const store of ['dictionaries', 'terms', 'termMeta', 'kanji', 'kanjiMeta', 'tagMeta'] as ObjectStoreName[]) {
-        rows[store] = (await backend.getAllRows(store)).map(({ value }) => value);
     }
     const { optionsPresets, tests } = readUpstreamJson<{ optionsPresets: unknown; tests: unknown[] }>(
         'translator-test-inputs.json',
     );
-    return { dictionaryName: TRANSLATOR_FIXTURE_DICTIONARY, rows, optionsPresets, tests };
+    return { dictionaryName: TRANSLATOR_FIXTURE_DICTIONARY, files, optionsPresets, tests };
 }
 
 async function bundle(profile: 'default' | 'hermes-stable'): Promise<string> {
@@ -122,7 +106,7 @@ describe('Hermes smoke test', () => {
     test.skipIf(!hasHermes && process.env.REQUIRE_HERMES !== '1')(
         'Hermes reproduces every upstream translator golden result',
         async () => {
-            const input = await createSmokeInput();
+            const input = createSmokeInput();
             const code = [
                 readFileSync(join(here, 'hermes', 'react-native-prelude.js'), 'utf8'),
                 `var __SMOKE_INPUT__ = ${JSON.stringify(input)};`,
@@ -136,8 +120,22 @@ describe('Hermes smoke test', () => {
             if (errorIndex >= 0) {
                 throw new Error(output.slice(errorIndex));
             }
+            const mediaMarker = '__SMOKE_MEDIA__';
+            const mediaLine = output.slice(output.indexOf(mediaMarker) + mediaMarker.length).split('\n')[0];
+            expect(JSON.parse(mediaLine)).toEqual([
+                [64, 64],
+                [7, 7],
+            ]);
+            const clientMarker = '__SMOKE_CLIENT__';
+            const clientLine = output.slice(output.indexOf(clientMarker) + clientMarker.length).split('\n')[0];
+            expect(JSON.parse(clientLine)).toEqual({
+                range: { start: 3, end: 7 },
+                sentence: { text: '今日は打ち込む。', offset: 3 },
+                parse: ['打ち込む', '\n', '打つ'],
+                recommended: true,
+            });
             const marker = '__SMOKE_RESULT__';
-            const results = JSON.parse(output.slice(output.indexOf(marker) + marker.length));
+            const results = JSON.parse(output.slice(output.indexOf(marker) + marker.length).split('\n')[0]);
             const expected =
                 readUpstreamJson<{ originalTextLength?: number; dictionaryEntries: unknown[] }[]>(
                     'translator-test-results.json',

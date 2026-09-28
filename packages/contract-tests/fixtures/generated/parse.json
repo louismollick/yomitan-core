@@ -1,0 +1,808 @@
+[
+  {
+    "text": "打ち込む",
+    "result": [
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "ち",
+          "reading": ""
+        },
+        {
+          "text": "込",
+          "reading": "こ"
+        },
+        {
+          "text": "む",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "打ち込む\n打つ",
+    "result": [
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込む",
+                    "transformedText": "打ち込む",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "ち",
+          "reading": ""
+        },
+        {
+          "text": "込",
+          "reading": "こ"
+        },
+        {
+          "text": "む",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "\n",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "つ",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "今日は打ち込んだ。",
+    "result": [
+      [
+        {
+          "text": "今日は",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込んだ",
+                    "transformedText": "打ち込んだ",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込んだ",
+                    "transformedText": "打ち込んだ",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込んだ",
+                    "transformedText": "打ち込んだ",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込んだ",
+                    "transformedText": "打ち込んだ",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "ち",
+          "reading": ""
+        },
+        {
+          "text": "込",
+          "reading": "こ"
+        },
+        {
+          "text": "んだ",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "。",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "ダースで打つ",
+    "result": [
+      [
+        {
+          "text": "ダース",
+          "reading": "",
+          "headwords": [
+            [
+              {
+                "term": "打",
+                "reading": "ダース",
+                "sources": [
+                  {
+                    "originalText": "ダース",
+                    "transformedText": "ダース",
+                    "deinflectedText": "ダース",
+                    "matchType": "exact",
+                    "matchSource": "reading",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        }
+      ],
+      [
+        {
+          "text": "で",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "つ",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "test 打った! 　打ち込み",
+    "result": [
+      [
+        {
+          "text": "test ",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打った",
+                    "transformedText": "打った",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打った",
+                    "transformedText": "打った",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打った",
+                    "transformedText": "打った",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打った",
+                    "transformedText": "打った",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "った",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "! 　",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込み",
+                    "transformedText": "打ち込み",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込み",
+                    "transformedText": "打ち込み",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "うちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込み",
+                    "transformedText": "打ち込み",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打ち込む",
+                "reading": "ぶちこむ",
+                "sources": [
+                  {
+                    "originalText": "打ち込み",
+                    "transformedText": "打ち込み",
+                    "deinflectedText": "打ち込む",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "ち",
+          "reading": ""
+        },
+        {
+          "text": "込",
+          "reading": "こ"
+        },
+        {
+          "text": "み",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "𠀋打つ",
+    "result": [
+      [
+        {
+          "text": "𠀋",
+          "reading": ""
+        }
+      ],
+      [
+        {
+          "text": "打",
+          "reading": "う",
+          "headwords": [
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "うつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ],
+            [
+              {
+                "term": "打つ",
+                "reading": "ぶつ",
+                "sources": [
+                  {
+                    "originalText": "打つ",
+                    "transformedText": "打つ",
+                    "deinflectedText": "打つ",
+                    "matchType": "exact",
+                    "matchSource": "term",
+                    "isPrimary": true
+                  }
+                ],
+                "frequencies": [],
+                "pronunciations": []
+              }
+            ]
+          ]
+        },
+        {
+          "text": "つ",
+          "reading": ""
+        }
+      ]
+    ]
+  },
+  {
+    "text": "",
+    "result": []
+  }
+]

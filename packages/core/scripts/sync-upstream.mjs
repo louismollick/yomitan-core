@@ -209,11 +209,17 @@ fs.writeFileSync(
         .join('\n')}\n};\n`,
 );
 
+fs.writeFileSync(
+    path.join(outDir, 'pin.js'),
+    `${HEADER}/** The upstream commit this tree was vendored from, and the Yomitan release it corresponds to. */\nexport const upstreamPin = ${JSON.stringify({ commit: config.commit, yomitanVersion: config.yomitanVersion })};\n`,
+);
+
 // 5. Libs
 const libDir = path.join(outDir, 'ext', 'lib');
 fs.mkdirSync(libDir, { recursive: true });
 const libEntries = {
     'ext/lib/zip.js': path.join(packageDir, 'scripts', 'lib', 'zip.js'),
+    'ext/lib/zip-full.js': path.join(packageDir, 'scripts', 'lib', 'zip-full.js'),
     'ext/lib/handlebars.js': path.join(packageDir, 'scripts', 'lib', 'handlebars.js'),
     'ext/lib/hangul-js.js': path.join(packageDir, 'scripts', 'lib', 'hangul-js.js'),
     'ext/lib/kanji-processor.js': path.join(packageDir, 'scripts', 'lib', 'kanji-processor.js'),

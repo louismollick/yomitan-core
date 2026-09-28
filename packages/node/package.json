@@ -1,0 +1,40 @@
+{
+  "name": "@yomitan-core/node",
+  "version": "2.0.0",
+  "description": "Node.js adapters for yomitan-core: SQLite storage over better-sqlite3 and file-system dictionary sources.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/louismollick/yomitan-core.git",
+    "directory": "packages/node"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "yomitan-core": "2.0.0"
+  },
+  "peerDependencies": {
+    "better-sqlite3": ">=11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.4.1"
+  }
+}

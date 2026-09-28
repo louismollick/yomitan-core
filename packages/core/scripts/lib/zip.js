@@ -1,9 +1,27 @@
-// zip.js without web workers. Upstream's importer calls configure({workerScripts}); workers are
-// disabled here so the importer runs identically in browsers, workers, Node and React Native.
-import { configure as baseConfigure } from '@zip.js/zip.js/lib/zip-no-worker-inflate.js';
+// What upstream's dictionary-importer.js imports from lib/zip.js. yomitan-core replaces the
+// importer's archive access (src/import/importer.ts), so the importer only needs these names:
+// `configure` is called once, and `TextWriter`/`BlobWriter` are instantiated only to say which form
+// of a file it wants. Real zip reading lives in lib/zip-full.js, loaded on demand, because zip.js
+// touches TransformStream at module load, which React Native does not have.
 
-export * from '@zip.js/zip.js/lib/zip-no-worker-inflate.js';
+export function configure() {}
 
-export function configure(options) {
-    baseConfigure({ ...options, workerScripts: undefined, useWebWorkers: false });
+export class TextWriter {}
+
+export class BlobWriter {}
+
+function unsupported() {
+    throw new Error('Use a yomitan-core ArchiveReader to read dictionary archives');
+}
+
+export class Uint8ArrayReader {
+    constructor() {
+        unsupported();
+    }
+}
+
+export class ZipReader {
+    constructor() {
+        unsupported();
+    }
 }
