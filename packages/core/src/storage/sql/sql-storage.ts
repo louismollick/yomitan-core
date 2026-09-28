@@ -340,6 +340,12 @@ export class SqlWriteSessions implements WriteSessionStore {
             );
         });
 
+        return this.createHandle(record, owner);
+    }
+
+    /** The live handle for a session this process owns: guard, heartbeat timer, end and abandon. */
+    private createHandle(record: WriteSessionRecord, owner: string): WriteSession {
+        const { driver } = this.backend;
         // Runs inside a transaction the backend already holds, so it talks to the driver directly.
         const guard: WriteGuard = async () => {
             const { changes } = await driver.run(
@@ -402,14 +408,27 @@ export class SqlWriteSessions implements WriteSessionStore {
         return new Set(rows.map(({ title }) => title));
     }
 
-    async removeIfStale(id: string): Promise<boolean> {
-        return await this.backend.transaction(async () => {
+    async claimIfStale(id: string): Promise<WriteSession | null> {
+        const owner = createSessionId();
+        const claimed = await this.backend.transaction(async () => {
             const { changes } = await this.backend.driver.run(
-                'DELETE FROM yomitan_write_sessions WHERE id = ? AND heartbeatAt <= ?',
-                [id, this.now() - this.staleAfterMs],
+                'UPDATE yomitan_write_sessions SET owner = ?, heartbeatAt = ? WHERE id = ? AND heartbeatAt <= ?',
+                [owner, this.now(), id, this.now() - this.staleAfterMs],
             );
-            return changes > 0;
+            if (changes === 0) {
+                return null;
+            }
+            const [row] = await this.backend.driver.all<SessionRow>(
+                'SELECT id, kind, title, startedAt FROM yomitan_write_sessions WHERE id = ?',
+                [id],
+            );
+            return row;
         });
+        if (claimed === null || claimed === undefined) {
+            return null;
+        }
+        const { kind, title, startedAt } = claimed;
+        return this.createHandle({ id, kind, title, startedAt: Number(startedAt) }, owner);
     }
 }
 

@@ -45,3 +45,15 @@ export async function createDictionaryArchive(dictionary: string, options: Archi
     const blob = await zipWriter.close();
     return await blob.arrayBuffer();
 }
+
+/** Zips in-memory files (strings are file text). */
+export async function zipFiles(files: Record<string, string | Uint8Array>, level = 6): Promise<ArrayBuffer> {
+    const zipWriter = new ZipWriter(new BlobWriter(), { level });
+    for (const [name, content] of Object.entries(files)) {
+        await zipWriter.add(
+            name,
+            typeof content === 'string' ? new TextReader(content) : new Uint8ArrayReader(content),
+        );
+    }
+    return await (await zipWriter.close()).arrayBuffer();
+}

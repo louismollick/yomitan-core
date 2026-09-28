@@ -88,3 +88,31 @@ export async function importDictionaryArchive(
         await reader.close?.();
     }
 }
+
+class ValidationComplete extends Error {}
+
+/**
+ * Runs upstream's importer up to its first write: the index, every data bank's schema and the
+ * minimum version are validated, nothing is stored. Used before replacing an installed dictionary.
+ * Relies on upstream validating all banks before adding the summary row.
+ */
+export async function validateDictionaryArchive(reader: ArchiveReader): Promise<Error[]> {
+    const dryRun = {
+        isPrepared: () => true,
+        dictionaryExists: async () => false,
+        addWithResult: async () => {
+            throw new ValidationComplete();
+        },
+    };
+    try {
+        const { errors } = await importDictionaryArchive(dryRun as unknown as DictionaryStorage, {
+            entries: () => reader.entries(),
+        });
+        return errors.length > 0 ? errors : [new Error('The archive has no data to import')];
+    } catch (error) {
+        if (error instanceof ValidationComplete) {
+            return [];
+        }
+        return [error instanceof Error ? error : new Error(String(error))];
+    }
+}

@@ -8,7 +8,7 @@
 
 import { type ArchiveEntry, type ArchiveReader, createZipArchiveReader } from '../import/archive';
 import type { ImageInfoReader } from '../import/image-info';
-import { type ImportProgress, importDictionaryArchive } from '../import/importer';
+import { type ImportProgress, importDictionaryArchive, validateDictionaryArchive } from '../import/importer';
 import {
     type FindTermsDetails,
     type FindTermsMode,
@@ -213,8 +213,13 @@ export async function createYomitan(options: CreateYomitanOptions) {
     const prepareArchive = async (source: ArchiveSource, signal?: AbortSignalLike): Promise<PreparedArchive> => {
         throwIfAborted(signal);
         const reader = await toReader(source, signal);
-        const { entries, title } = await readIndexTitle(reader);
-        return { reader: { entries: async () => entries, close: reader.close?.bind(reader) }, title };
+        try {
+            const { entries, title } = await readIndexTitle(reader);
+            return { reader: { entries: async () => entries, close: reader.close?.bind(reader) }, title };
+        } catch (error) {
+            await reader.close?.();
+            throw error;
+        }
     };
 
     /** User progress callbacks must not be able to interrupt a write half-way. */
@@ -232,8 +237,14 @@ export async function createYomitan(options: CreateYomitanOptions) {
         { reader, title }: PreparedArchive,
         { signal, onProgress }: Omit<ImportOptions, 'source'>,
     ): Promise<InstalledDictionary> => {
-        throwIfAborted(signal);
-        const session = await storage.sessions.begin('import', title);
+        let session: Awaited<ReturnType<typeof storage.sessions.begin>>;
+        try {
+            throwIfAborted(signal);
+            session = await storage.sessions.begin('import', title);
+        } catch (error) {
+            await reader.close?.();
+            throw error;
+        }
         let installed: InstalledDictionary;
         try {
             // Checked inside the exclusive session: a duplicate is refused before anything is written,
@@ -399,9 +410,17 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 // Download and read the new archive before touching the installed dictionary.
                 const prepared = await prepareArchive({ url: update.downloadUrl }, signal);
                 if (prepared.title !== title) {
+                    await prepared.reader.close?.();
                     throw new DictionaryImportError([
                         new Error(`The update for ${title} contains a different dictionary (${prepared.title})`),
                     ]);
+                }
+                // Upstream's importer validates every bank before writing; run it that far first, so a
+                // broken update never costs the installed version.
+                const validationErrors = await validateDictionaryArchive(prepared.reader);
+                if (validationErrors.length > 0) {
+                    await prepared.reader.close?.();
+                    throw new DictionaryImportError(validationErrors);
                 }
                 throwIfAborted(signal);
                 const index = profile.options.dictionaries.findIndex(({ name }) => name === title);

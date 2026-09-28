@@ -15,7 +15,7 @@ import {
 } from '../../core/src/client/yomitan';
 import { createFilesArchiveReader } from '../../core/src/import/archive';
 import type { YomitanStorage } from '../../core/src/storage/types';
-import { createDictionaryArchive } from './fixtures';
+import { createDictionaryArchive, zipFiles } from './fixtures';
 import { readFixtureDictionaryFiles } from './import-contract';
 
 export type CreateClientStorage = () => Promise<YomitanStorage> | YomitanStorage;
@@ -284,6 +284,38 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             expect(requested).toContain('https://example.test/d.zip');
             expect((await urlClient.dictionaries.list()).map(({ title }) => title)).toEqual([TITLE]);
             await urlClient.dispose();
+        });
+
+        test('an update with a broken data bank keeps the installed dictionary', async ({ expect }) => {
+            const files = readFixtureDictionaryFiles('valid-dictionary1');
+            const updatable = {
+                ...JSON.parse(files['index.json'] as string),
+                isUpdatable: true,
+                indexUrl: 'https://example.test/index.json',
+                downloadUrl: 'https://example.test/d.zip',
+            };
+            files['index.json'] = JSON.stringify(updatable);
+            const brokenArchive = await zipFiles({
+                ...files,
+                'index.json': JSON.stringify({ ...updatable, revision: 'test2' }),
+                'term_bank_1.json': '[["x"]]',
+            });
+            const client = await createYomitan({
+                storage: await createStorage(),
+                fetch: async (url) =>
+                    url.endsWith('index.json')
+                        ? jsonResponse({ ...updatable, revision: 'test2' })
+                        : { ok: true, status: 200, json: async () => ({}), arrayBuffer: async () => brokenArchive },
+                archiveReaders: { directory: () => createFilesArchiveReader(files) },
+            });
+            await client.dictionaries.import({ source: { directory: 'main' } });
+            await expect(client.dictionaries.update(TITLE)).rejects.toBeInstanceOf(DictionaryImportError);
+            expect((await client.dictionaries.list()).map(({ title, revision }) => [title, revision])).toEqual([
+                [TITLE, 'test'],
+            ]);
+            expect(client.profile.get().options.dictionaries.map(({ name }) => name)).toEqual([TITLE]);
+            expect((await client.lookup.terms('打ち込む')).entries.length).toBeGreaterThan(0);
+            await client.dispose();
         });
 
         test('updates keep the dictionary position and settings in the profile', async ({ expect }) => {

@@ -39,10 +39,11 @@ export interface WriteSessionStore {
     /** Titles with a live session (imports or deletes in progress). */
     listLiveTitles(): Promise<Set<string>>;
     /**
-     * Removes a session if it is still stale, atomically; afterwards its owner can no longer write.
-     * Returns false if the session renewed its heartbeat (or is gone) in the meantime.
+     * Takes over a session if it is still stale, atomically: its old owner can no longer write, and
+     * no other writer can start until the returned session ends. Returns null if the session renewed
+     * its heartbeat (or is gone) in the meantime.
      */
-    removeIfStale(id: string): Promise<boolean>;
+    claimIfStale(id: string): Promise<WriteSession | null>;
 }
 
 export class StorageBusyError extends Error {
@@ -84,11 +85,19 @@ export async function recoverWriteSessions(
     sessions: WriteSessionStore,
 ): Promise<string[]> {
     const recovered: string[] = [];
-    for (const session of await sessions.listStale()) {
-        if (await sessions.removeIfStale(session.id)) {
-            await storage.deleteDictionary(session.title, 1000, () => {});
-            recovered.push(session.title);
+    for (const stale of await sessions.listStale()) {
+        const claimed = await sessions.claimIfStale(stale.id);
+        if (claimed === null) {
+            continue;
         }
+        try {
+            await storage.withWriteGuard(claimed.guard).deleteDictionary(stale.title, 1000, () => {});
+        } catch (error) {
+            claimed.abandon();
+            throw error;
+        }
+        await claimed.end();
+        recovered.push(stale.title);
     }
     // Interrupted imports without a session: only sweep while no other write is in progress, holding
     // a session so no import can start in between. Nothing to sweep means no write at all, so
@@ -160,7 +169,7 @@ export class InProcessWriteSessions implements WriteSessionStore {
         return new Set(this.active === null ? [] : [this.active.title]);
     }
 
-    async removeIfStale(_id: string): Promise<boolean> {
-        return false;
+    async claimIfStale(_id: string): Promise<WriteSession | null> {
+        return null;
     }
 }

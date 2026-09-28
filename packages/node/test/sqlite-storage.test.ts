@@ -169,7 +169,7 @@ describe('SQLite write sessions', () => {
         now += 121_000;
         const [stale] = await recoverer.sessions.listStale();
         await owner.withWriteGuard(session.guard).bulkAdd('tagMeta', [{ name: 'x', dictionary: TITLE }], 0, 1);
-        expect(await recoverer.sessions.removeIfStale(stale.id)).toBe(false);
+        expect(await recoverer.sessions.claimIfStale(stale.id)).toBeNull();
         await expect(
             owner.withWriteGuard(session.guard).bulkAdd('tagMeta', [{ name: 'y', dictionary: TITLE }], 0, 1),
         ).resolves.toBeUndefined();
@@ -198,6 +198,30 @@ describe('SQLite write sessions', () => {
         expect((await other.getDictionaryInfo()).map(({ title }) => title)).toEqual([TITLE]);
         await owner.close();
         await other.close();
+    });
+
+    test('a claimed stale session keeps other writers out until recovery ends', async () => {
+        const path = tempPath();
+        let now = 1_000_000;
+        const clock = () => now;
+        const owner = createNodeStorage(path, { sessions: { now: clock, heartbeatIntervalMs: 3_600_000 } });
+        const recoverer = createNodeStorage(path, { sessions: { now: clock, heartbeatIntervalMs: 3_600_000 } });
+        await owner.prepare();
+        await recoverer.prepare();
+        const session = await owner.sessions.begin('import', TITLE);
+        now += 121_000;
+        const [stale] = await recoverer.sessions.listStale();
+        const claimed = await recoverer.sessions.claimIfStale(stale.id);
+        expect(claimed?.record.title).toBe(TITLE);
+        await expect(recoverer.sessions.begin('import', 'Other')).rejects.toBeInstanceOf(StorageBusyError);
+        await expect(
+            owner.withWriteGuard(session.guard).bulkAdd('tagMeta', [{ name: 'x', dictionary: TITLE }], 0, 1),
+        ).rejects.toBeInstanceOf(SessionLostError);
+        await claimed?.end();
+        const next = await recoverer.sessions.begin('import', 'Other');
+        await next.end();
+        await owner.close();
+        await recoverer.close();
     });
 
     test('the interrupted-import sweep waits while another write is live', async () => {
