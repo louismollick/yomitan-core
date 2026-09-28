@@ -6,6 +6,8 @@
  * construction dependencies (storage, fetch, archive readers) stay wherever the client runs.
  */
 
+import { AnkiNotes, type BuildNoteOptions } from '../anki/anki';
+import type { StringElement } from '../dom/string-dom';
 import { type ArchiveEntry, type ArchiveReader, createZipArchiveReader } from '../import/archive';
 import type { ImageInfoReader } from '../import/image-info';
 import { type ImportProgress, importDictionaryArchive, validateDictionaryArchive } from '../import/importer';
@@ -20,12 +22,15 @@ import type { Sentence } from '../lookup/text-source';
 import { type AbortSignalLike, type BlobLike, isBlobLike } from '../platform/types';
 import { setUpstreamFetch } from '../platform/upstream-env';
 import { type Profile, ProfileFormat, syncDictionarySettings } from '../profile/profile';
+import { type ThemeContext, getCustomCss, getDisplayAttributes } from '../render/display-options';
+import { EntryRenderer, createStringDomEnvironment } from '../render/entry-renderer';
+import { type HtmlMediaMode, getPopupCss, renderHtmlDocument, resolveImages } from '../render/html';
 import { recoverWriteSessions } from '../storage/sessions';
 import type { Summary, YomitanStorage } from '../storage/types';
 import { compareRevisions } from '../upstream/ext/js/dictionary/dictionary-data-util.js';
 import { Translator } from '../upstream/ext/js/language/translator.js';
 import { dictionaryIndex as validateDictionaryIndex } from '../upstream/ext/lib/validate-schemas.js';
-import type { KanjiDictionaryEntry, TermDictionaryEntry } from '../upstream/types/ext/dictionary';
+import type { DictionaryEntry, KanjiDictionaryEntry, TermDictionaryEntry } from '../upstream/types/ext/dictionary';
 
 type Fetch = (
     input: string,
@@ -385,6 +390,28 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return await translator.findTerms('simple', text, getFindTermsOptions('simple', details, profile.options));
     };
 
+    const ankiNotes = new AnkiNotes();
+    let stringRenderer: Promise<EntryRenderer<StringElement>> | null = null;
+
+    const getMediaBytes = async (dictionary: string, path: string) => {
+        const [media] = await storage.getMedia([{ dictionary, path }]);
+        return media === undefined ? null : { mediaType: media.mediaType, content: new Uint8Array(media.content) };
+    };
+
+    const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> => {
+        stringRenderer ??= EntryRenderer.create<StringElement>(createStringDomEnvironment());
+        const renderer = await stringRenderer;
+        renderer.setLanguage(profile.options.general.language);
+        const dictionaryInfo = await listInstalled();
+        let html = '';
+        for (const entry of entries) {
+            const node = renderer.render(entry, dictionaryInfo);
+            await resolveImages(node, media, getMediaBytes);
+            html += node.outerHTML;
+        }
+        return html;
+    };
+
     return {
         profile: {
             /** The current profile. Persist it and pass it back to `createYomitan` next time. */
@@ -523,6 +550,47 @@ export async function createYomitan(options: CreateYomitanOptions) {
             /** The sentence around `[offset, offset + length)` under the profile's sentence rules. */
             sentence(text: string, offset: number, length = 0): Sentence {
                 return sentenceAt(text, offset, length, profile.options);
+            },
+        },
+
+        render: {
+            /**
+             * Entries as Yomitan's popup markup. Style it with `css()` and put `attributes()` on the
+             * element that stands in for Yomitan's document root.
+             */
+            html(entries: DictionaryEntry[], { media = 'placeholder' }: { media?: HtmlMediaMode } = {}): Promise<string> {
+                assertUsable();
+                return renderEntriesHtml(entries, media);
+            },
+            /** A standalone HTML document of the entries, styled like Yomitan's popup (for WebViews). */
+            async document(
+                entries: DictionaryEntry[],
+                { media = 'data-uri', theme }: { media?: HtmlMediaMode; theme?: ThemeContext } = {},
+            ): Promise<string> {
+                assertUsable();
+                return await renderHtmlDocument(await renderEntriesHtml(entries, media), profile.options, theme);
+            },
+            /** Yomitan's popup CSS followed by the profile's custom CSS and dictionary styles. */
+            async css(): Promise<string> {
+                return `${await getPopupCss()}\n${getCustomCss(profile.options)}`;
+            },
+            /** The root `data-*` attributes (as `dataset` keys) the popup CSS keys off. */
+            attributes(theme?: ThemeContext): Record<string, string> {
+                return getDisplayAttributes(profile.options, theme);
+            },
+        },
+
+        anki: {
+            /** The markers card format fields can use, including per-dictionary ones. */
+            async markers(type: 'term' | 'kanji'): Promise<string[]> {
+                return ankiNotes.getMarkers(type, profile.options, await listInstalled());
+            },
+            /** Yomitan's default field templates. */
+            defaultTemplates: () => ankiNotes.getDefaultTemplates(),
+            /** Builds a note with Yomitan's note builder and the profile's card format. */
+            async buildNote(entry: DictionaryEntry, options?: BuildNoteOptions) {
+                assertUsable();
+                return await ankiNotes.buildNote(entry, profile.options, await listInstalled(), options);
             },
         },
 

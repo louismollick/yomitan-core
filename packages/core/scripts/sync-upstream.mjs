@@ -202,6 +202,28 @@ for (const file of assetFiles) {
     fs.writeFileSync(target, `${HEADER}export default ${value};\n`);
     assetEntries.push([`/${file.replace(/^ext\//, '')}`, `./${moduleFile}`]);
 }
+// Popup stylesheets: SVG icons are inlined as data URIs; font faces are dropped (the web package
+// provides the kanji stroke-order font itself).
+const fontFaces = [];
+for (const file of config.css ?? []) {
+    let css = fs.readFileSync(path.join(upstreamDir, file), 'utf8');
+    css = css.replace(/@font-face\s*\{[^}]*\}/g, (block) => {
+        fontFaces.push(block.replace(/\s+/g, ' '));
+        return '';
+    });
+    css = css.replace(/url\((['"]?)(\/images\/[^'")]+\.svg)\1\)/g, (_match, _quote, imagePath) => {
+        const svg = fs.readFileSync(path.join(upstreamDir, 'ext', imagePath), 'utf8');
+        return `url("data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}")`;
+    });
+    if (/url\((['"]?)\//.test(css)) {
+        throw new Error(`${file} still references an extension-relative URL`);
+    }
+    const moduleFile = `${file}.js`;
+    fs.mkdirSync(path.dirname(path.join(outDir, moduleFile)), {recursive: true});
+    fs.writeFileSync(path.join(outDir, moduleFile), `${HEADER}export default ${JSON.stringify(css)};\n`);
+    assetEntries.push([`/${file.replace(/^ext\//, '')}`, `./${moduleFile}`]);
+}
+
 fs.writeFileSync(
     path.join(outDir, 'assets.js'),
     `${HEADER}/** @type {Record<string, () => Promise<{default: unknown}>>} */\nexport const upstreamAssets = {\n${assetEntries

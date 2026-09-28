@@ -14,3 +14,4 @@ export {
 } from './import-contract';
 export { type CreateClientStorage, runClientContract } from './client-contract';
 export { runGeneratedGoldens, toUpstreamParseResult } from './generated-goldens';
+export { createFakeAnki, runRenderAnkiContract } from './render-anki-contract';

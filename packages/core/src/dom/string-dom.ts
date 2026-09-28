@@ -833,6 +833,11 @@ export class StringDocument extends StringParentNode {
         return new StringTreeWalker(root, whatToShow);
     }
 
+    /** Forward iteration is all the vendored code uses; it matches a tree walker's order. */
+    createNodeIterator(root: StringNode, whatToShow = 0xffffffff): StringTreeWalker {
+        return new StringTreeWalker(root, whatToShow);
+    }
+
     importNode<T extends StringNode>(node: T, deep = false): T {
         const clone = node.cloneNode(deep) as T;
         const adopt = (current: StringNode) => {

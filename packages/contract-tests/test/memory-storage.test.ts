@@ -10,6 +10,7 @@ import {
     runClientContract,
     runGeneratedGoldens,
     runImportContract,
+    runRenderAnkiContract,
     runStorageContract,
     runTranslatorParity,
 } from '../src/index';
@@ -19,6 +20,7 @@ runTranslatorParity('memory', createMemoryStorage);
 runImportContract('memory', createMemoryStorage);
 runClientContract('memory', createMemoryStorage);
 runGeneratedGoldens('memory', createMemoryStorage);
+runRenderAnkiContract('memory', createMemoryStorage);
 
 test('memory: recovery removes a dictionary after replacement deletion fails', async ({ expect }) => {
     const TITLE = 'Test Dictionary';

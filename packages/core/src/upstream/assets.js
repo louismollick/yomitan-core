@@ -40,4 +40,8 @@ export const upstreamAssets = {
     "/data/templates/anki-field-templates-upgrade-v8.handlebars": () => import("./ext/data/templates/anki-field-templates-upgrade-v8.handlebars.js"),
     "/data/templates/default-anki-field-templates.handlebars": () => import("./ext/data/templates/default-anki-field-templates.handlebars.js"),
     "/templates-display.html": () => import("./ext/templates-display.html.js"),
+    "/css/material.css": () => import("./ext/css/material.css.js"),
+    "/css/display.css": () => import("./ext/css/display.css.js"),
+    "/css/display-pronunciation.css": () => import("./ext/css/display-pronunciation.css.js"),
+    "/css/structured-content.css": () => import("./ext/css/structured-content.css.js"),
 };
