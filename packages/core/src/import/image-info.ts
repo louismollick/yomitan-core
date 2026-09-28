@@ -170,14 +170,28 @@ function readIsobmff(b: Uint8Array): ImageSize | null {
     return null;
 }
 
-const SVG_ABSOLUTE_LENGTH = /^\s*([0-9]*\.?[0-9]+)\s*(px)?\s*$/i;
+const SVG_ABSOLUTE_LENGTH = /^\s*([0-9]*\.?[0-9]+)\s*(px|in|cm|mm|pt|pc|q)?\s*$/i;
+
+/** CSS absolute units in CSS pixels. */
+const SVG_UNIT_PIXELS: Record<string, number> = {
+    px: 1,
+    in: 96,
+    cm: 96 / 2.54,
+    mm: 96 / 25.4,
+    q: 96 / 101.6,
+    pt: 96 / 72,
+    pc: 16,
+};
 
 function readSvgLength(value: string | undefined): number | null {
     if (value === undefined) {
         return null;
     }
     const match = SVG_ABSOLUTE_LENGTH.exec(value);
-    return match === null ? null : Number.parseFloat(match[1]);
+    if (match === null) {
+        return null;
+    }
+    return Number.parseFloat(match[1]) * SVG_UNIT_PIXELS[(match[2] ?? 'px').toLowerCase()];
 }
 
 function readSvgAttribute(tag: string, name: string): string | undefined {

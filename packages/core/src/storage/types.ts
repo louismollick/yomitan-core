@@ -93,5 +93,5 @@ export interface StorageBackend {
     add(store: ObjectStoreName, rows: Record<string, unknown>[], guard?: WriteGuard): Promise<number[]>;
     put(store: ObjectStoreName, id: number, row: Record<string, unknown>, guard?: WriteGuard): Promise<void>;
     /** Deletes rows whose `index` field equals `value`; returns how many were deleted. */
-    deleteWhere(store: ObjectStoreName, index: string, value: string): Promise<number>;
+    deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number>;
 }

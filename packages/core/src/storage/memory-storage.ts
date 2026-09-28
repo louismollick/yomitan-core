@@ -119,7 +119,8 @@ class MemoryBackend implements StorageBackend {
         target.indexes.clear();
     }
 
-    async deleteWhere(store: ObjectStoreName, index: string, value: string): Promise<number> {
+    async deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number> {
+        await guard?.();
         const target = this.getStore(store);
         const ids = this.getIndex(target, index).get(value) ?? [];
         for (const id of ids) {

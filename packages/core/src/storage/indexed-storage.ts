@@ -155,7 +155,7 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
             }
             for (let i = 0; i < targets.length; ++i) {
                 const [store, index] = targets[i];
-                const deleted = await this.backend.deleteWhere(store, index, dictionaryName);
+                const deleted = await this.backend.deleteWhere(store, index, dictionaryName, this.writeGuard);
                 for (let j = 0; j < deleted; ++j) {
                     const processed = progressData.processed + 1;
                     progressData.processed = processed;

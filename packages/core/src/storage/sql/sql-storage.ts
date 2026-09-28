@@ -235,9 +235,12 @@ export class SqlBackend implements StorageBackend {
         });
     }
 
-    deleteWhere(store: ObjectStoreName, index: string, value: string): Promise<number> {
+    deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number> {
         this.assertColumn(store, index);
         return this.transaction(async () => {
+            if (guard !== undefined) {
+                await guard();
+            }
             const result = await this.driver.run(`DELETE FROM ${quote(store)} WHERE ${quote(index)} = ?`, [value]);
             return result.changes;
         });
@@ -372,6 +375,10 @@ export class SqlWriteSessions implements WriteSessionStore {
                     ]);
                 });
             },
+            abandon: () => {
+                ended = true;
+                clearInterval(timer);
+            },
         };
     }
 
@@ -395,9 +402,13 @@ export class SqlWriteSessions implements WriteSessionStore {
         return new Set(rows.map(({ title }) => title));
     }
 
-    async remove(id: string): Promise<void> {
-        await this.backend.transaction(async () => {
-            await this.backend.driver.run('DELETE FROM yomitan_write_sessions WHERE id = ?', [id]);
+    async removeIfStale(id: string): Promise<boolean> {
+        return await this.backend.transaction(async () => {
+            const { changes } = await this.backend.driver.run(
+                'DELETE FROM yomitan_write_sessions WHERE id = ? AND heartbeatAt <= ?',
+                [id, this.now() - this.staleAfterMs],
+            );
+            return changes > 0;
         });
     }
 }

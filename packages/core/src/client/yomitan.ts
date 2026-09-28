@@ -207,35 +207,58 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return await options.archiveReaders.directory((source as { directory: string }).directory);
     };
 
-    const importFrom = async ({ source, signal, onProgress }: ImportOptions): Promise<InstalledDictionary> => {
+    /** An archive whose index has been read, ready to import. */
+    type PreparedArchive = { reader: ArchiveReader; title: string };
+
+    const prepareArchive = async (source: ArchiveSource, signal?: AbortSignalLike): Promise<PreparedArchive> => {
         throwIfAborted(signal);
         const reader = await toReader(source, signal);
         const { entries, title } = await readIndexTitle(reader);
-        const cachedReader: ArchiveReader = { entries: async () => entries, close: reader.close?.bind(reader) };
+        return { reader: { entries: async () => entries, close: reader.close?.bind(reader) }, title };
+    };
+
+    /** User progress callbacks must not be able to interrupt a write half-way. */
+    const safely =
+        <T>(callback: ((value: T) => void) | undefined) =>
+        (value: T) => {
+            try {
+                callback?.(value);
+            } catch {
+                // Ignored: a failing progress listener is the caller's problem, not the database's.
+            }
+        };
+
+    const importPrepared = async (
+        { reader, title }: PreparedArchive,
+        { signal, onProgress }: Omit<ImportOptions, 'source'>,
+    ): Promise<InstalledDictionary> => {
         throwIfAborted(signal);
         const session = await storage.sessions.begin('import', title);
         let installed: InstalledDictionary;
         try {
+            // Checked inside the exclusive session: a duplicate is refused before anything is written,
+            // so the installed dictionary is never touched by the failure cleanup below.
+            if (await storage.dictionaryExists(title)) {
+                await reader.close?.();
+                throw new DictionaryImportError([new Error(`Dictionary ${title} is already imported, skipped it.`)]);
+            }
             const guarded = storage.withWriteGuard(async () => {
                 await session.guard();
                 throwIfAborted(signal);
             });
             let outcome: Awaited<ReturnType<typeof importDictionaryArchive>>;
             try {
-                outcome = await importDictionaryArchive(guarded, cachedReader, {
+                outcome = await importDictionaryArchive(guarded, reader, {
                     imageInfoReader: options.imageInfoReader,
-                    onProgress,
+                    onProgress: safely(onProgress),
                 });
             } catch (error) {
                 outcome = { result: null, errors: [error instanceof Error ? error : new Error(String(error))] };
             }
             const { result, errors } = outcome;
-            if (errors.length > 0 || result === null) {
+            if (errors.length > 0 || result === null || signal?.aborted) {
                 // Atomic import: remove whatever was written (a listed deviation from upstream).
-                const alreadyInstalled = errors.some((error) => /already imported/.test(error.message));
-                if (!alreadyInstalled) {
-                    await storage.deleteDictionary(title, 1000, () => {});
-                }
+                await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
                 if (signal?.aborted) {
                     throw new YomitanAbortError();
                 }
@@ -251,18 +274,27 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return installed;
     };
 
+    const importFrom = async ({ source, signal, onProgress }: ImportOptions): Promise<InstalledDictionary> =>
+        await importPrepared(await prepareArchive(source, signal), { signal, onProgress });
+
     const deleteDictionary = async (
         title: string,
         onProgress?: (progress: { processed: number; count: number }) => void,
     ) => {
         const session = await storage.sessions.begin('delete', title);
         try {
-            await storage.deleteDictionary(title, 1000, (progress) =>
-                onProgress?.({ processed: progress.processed, count: progress.count }),
-            );
-        } finally {
-            await session.end();
+            const report = safely(onProgress);
+            await storage
+                .withWriteGuard(session.guard)
+                .deleteDictionary(title, 1000, (progress) =>
+                    report({ processed: progress.processed, count: progress.count }),
+                );
+        } catch (error) {
+            // Partially deleted: leave the session to go stale so recovery finishes the delete.
+            session.abandon();
+            throw error;
         }
+        await session.end();
         translator.clearDatabaseCaches();
         await syncProfile(true);
     };
@@ -364,10 +396,18 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 if (update === undefined) {
                     throw new Error(`No update available for ${title}`);
                 }
+                // Download and read the new archive before touching the installed dictionary.
+                const prepared = await prepareArchive({ url: update.downloadUrl }, signal);
+                if (prepared.title !== title) {
+                    throw new DictionaryImportError([
+                        new Error(`The update for ${title} contains a different dictionary (${prepared.title})`),
+                    ]);
+                }
+                throwIfAborted(signal);
                 const index = profile.options.dictionaries.findIndex(({ name }) => name === title);
                 const settings = index >= 0 ? clone(profile.options.dictionaries[index]) : null;
                 await deleteDictionary(title);
-                const result = await importFrom({ source: { url: update.downloadUrl }, signal, onProgress });
+                const result = await importPrepared(prepared, { signal, onProgress });
                 if (settings !== null) {
                     const current = profile.options.dictionaries.findIndex(({ name }) => name === result.title);
                     if (current >= 0) {

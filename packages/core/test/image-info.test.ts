@@ -94,6 +94,8 @@ describe('readImageSize', () => {
             height: 10,
         });
         expect(readImageSize(svg('width="50%"'), 'image/svg+xml')).toEqual({ width: 0, height: 0 });
+        expect(readImageSize(svg('width="1in" height="0.5in"'), 'image/svg+xml')).toEqual({ width: 96, height: 48 });
+        expect(readImageSize(svg('width="12pt" height="1pc"'), 'image/svg+xml')).toEqual({ width: 16, height: 16 });
     });
     test('unreadable raster images fail like an image that would not load', async () => {
         expect(readImageSize(bytes('not a png'), 'image/png')).toBeNull();

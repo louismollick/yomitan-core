@@ -157,6 +157,64 @@ describe('SQLite write sessions', () => {
         await recoverer.close();
     });
 
+    test('recovery skips a session that renewed its heartbeat after being listed as stale', async () => {
+        const path = tempPath();
+        let now = 1_000_000;
+        const clock = () => now;
+        const owner = createNodeStorage(path, { sessions: { now: clock, heartbeatIntervalMs: 3_600_000 } });
+        const recoverer = createNodeStorage(path, { sessions: { now: clock } });
+        await owner.prepare();
+        await recoverer.prepare();
+        const session = await owner.sessions.begin('import', TITLE);
+        now += 121_000;
+        const [stale] = await recoverer.sessions.listStale();
+        await owner.withWriteGuard(session.guard).bulkAdd('tagMeta', [{ name: 'x', dictionary: TITLE }], 0, 1);
+        expect(await recoverer.sessions.removeIfStale(stale.id)).toBe(false);
+        await expect(
+            owner.withWriteGuard(session.guard).bulkAdd('tagMeta', [{ name: 'y', dictionary: TITLE }], 0, 1),
+        ).resolves.toBeUndefined();
+        await session.end();
+        await owner.close();
+        await recoverer.close();
+    });
+
+    test('a recovered delete cannot resume and delete a newer import', async () => {
+        const path = tempPath();
+        let now = 1_000_000;
+        const clock = () => now;
+        const owner = createNodeStorage(path, { sessions: { now: clock, heartbeatIntervalMs: 3_600_000 } });
+        const other = createNodeStorage(path, { sessions: { now: clock } });
+        await owner.prepare();
+        await other.prepare();
+        const deleting = await owner.sessions.begin('delete', TITLE);
+        now += 121_000;
+        await recoverWriteSessions(other, other.sessions);
+        const importing = await other.sessions.begin('import', TITLE);
+        await importFixture(other.withWriteGuard(importing.guard) as ReturnType<typeof createNodeStorage>);
+        await importing.end();
+        await expect(
+            owner.withWriteGuard(deleting.guard).deleteDictionary(TITLE, 1000, () => {}),
+        ).rejects.toBeInstanceOf(SessionLostError);
+        expect((await other.getDictionaryInfo()).map(({ title }) => title)).toEqual([TITLE]);
+        await owner.close();
+        await other.close();
+    });
+
+    test('the interrupted-import sweep waits while another write is live', async () => {
+        const path = tempPath();
+        const a = createNodeStorage(path);
+        const b = createNodeStorage(path);
+        await a.prepare();
+        await b.prepare();
+        await a.addWithResult('dictionaries', { title: 'In progress', importSuccess: false, version: 3 });
+        const live = await a.sessions.begin('import', 'In progress');
+        expect(await recoverWriteSessions(b, b.sessions)).toEqual([]);
+        expect((await b.getDictionaryInfo()).map(({ title }) => title)).toEqual(['In progress']);
+        await live.end();
+        await a.close();
+        await b.close();
+    });
+
     test('recovery removes an import whose summary never completed, even without a session', async () => {
         const storage = createNodeStorage(':memory:');
         await storage.prepare();

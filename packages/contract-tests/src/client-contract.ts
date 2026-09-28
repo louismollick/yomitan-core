@@ -158,6 +158,92 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             await client.dispose();
         });
 
+        test('a malformed archive with an installed title leaves the installed dictionary alone', async ({
+            expect,
+        }) => {
+            const files = readFixtureDictionaryFiles('valid-dictionary1');
+            const index = JSON.parse(files['index.json'] as string);
+            index.revision = undefined;
+            files['index.json'] = JSON.stringify(index);
+            const client = await withImported(createStorage, {
+                archiveReaders: { directory: () => createFilesArchiveReader(files) },
+            });
+            await expect(client.dictionaries.import({ source: { directory: 'broken' } })).rejects.toThrow(
+                'already imported',
+            );
+            expect((await client.lookup.terms('打ち込む')).entries.length).toBeGreaterThan(0);
+            await client.dispose();
+        });
+
+        test('a throwing progress listener does not break an import', async ({ expect }) => {
+            const client = await createYomitan({ storage: await createStorage() });
+            await client.dictionaries.import({
+                source: await createDictionaryArchive('valid-dictionary1'),
+                onProgress: () => {
+                    throw new Error('listener bug');
+                },
+            });
+            expect((await client.dictionaries.list()).map(({ title }) => title)).toEqual([TITLE]);
+            await client.dispose();
+        });
+
+        test('aborting at the last progress event still aborts the import', async ({ expect }) => {
+            const counting = await createYomitan({ storage: await createStorage() });
+            let events = 0;
+            await counting.dictionaries.import({
+                source: await createDictionaryArchive('valid-dictionary1'),
+                onProgress: () => {
+                    ++events;
+                },
+            });
+            await counting.dispose();
+            const client = await createYomitan({ storage: await createStorage() });
+            const controller = new AbortController();
+            let seen = 0;
+            await expect(
+                client.dictionaries.import({
+                    source: await createDictionaryArchive('valid-dictionary1'),
+                    signal: controller.signal,
+                    onProgress: () => {
+                        if (++seen === events) {
+                            controller.abort();
+                        }
+                    },
+                }),
+            ).rejects.toBeInstanceOf(YomitanAbortError);
+            expect(await client.dictionaries.list()).toEqual([]);
+            await client.dispose();
+        });
+
+        test('a failed update download keeps the installed dictionary', async ({ expect }) => {
+            const files = readFixtureDictionaryFiles('valid-dictionary1');
+            const updatable = {
+                ...JSON.parse(files['index.json'] as string),
+                isUpdatable: true,
+                indexUrl: 'https://example.test/index.json',
+                downloadUrl: 'https://example.test/d.zip',
+            };
+            files['index.json'] = JSON.stringify(updatable);
+            const client = await createYomitan({
+                storage: await createStorage(),
+                fetch: async (url) =>
+                    url.endsWith('index.json')
+                        ? jsonResponse({ ...updatable, revision: 'test2' })
+                        : {
+                              ok: false,
+                              status: 500,
+                              json: async () => ({}),
+                              arrayBuffer: async () => new ArrayBuffer(0),
+                          },
+                archiveReaders: { directory: () => createFilesArchiveReader(files) },
+            });
+            await client.dictionaries.import({ source: { directory: 'main' } });
+            await expect(client.dictionaries.update(TITLE)).rejects.toThrow('HTTP 500');
+            expect((await client.dictionaries.list()).map(({ title }) => title)).toEqual([TITLE]);
+            expect(client.profile.get().options.dictionaries.map(({ name }) => name)).toEqual([TITLE]);
+            await client.dispose();
+        });
+
         test('imports from a URL and checks for updates through the injected fetch', async ({ expect }) => {
             const archive = await createDictionaryArchive('valid-dictionary1', { level: 6 });
             const files = readFixtureDictionaryFiles('valid-dictionary1');
