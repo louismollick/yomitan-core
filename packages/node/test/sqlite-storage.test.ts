@@ -224,6 +224,24 @@ describe('SQLite write sessions', () => {
         await recoverer.close();
     });
 
+    test('a new session is refused while a stale one is unrecovered', async () => {
+        const path = tempPath();
+        let now = 1_000_000;
+        const clock = () => now;
+        const crashed = createNodeStorage(path, { sessions: { now: clock, heartbeatIntervalMs: 3_600_000 } });
+        const next = createNodeStorage(path, { sessions: { now: clock } });
+        await crashed.prepare();
+        await next.prepare();
+        await crashed.sessions.begin('import', TITLE);
+        now += 121_000;
+        await expect(next.sessions.begin('import', TITLE)).rejects.toBeInstanceOf(StorageBusyError);
+        await recoverWriteSessions(next, next.sessions);
+        const session = await next.sessions.begin('import', TITLE);
+        await session.end();
+        await crashed.close();
+        await next.close();
+    });
+
     test('the interrupted-import sweep waits while another write is live', async () => {
         const path = tempPath();
         const a = createNodeStorage(path);

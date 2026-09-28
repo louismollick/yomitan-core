@@ -32,7 +32,10 @@ export interface WriteSession {
 }
 
 export interface WriteSessionStore {
-    /** Starts a session, or throws {@link StorageBusyError} while another live session exists. */
+    /**
+     * Starts a session, or throws {@link StorageBusyError} while any other session exists, live or
+     * stale (stale ones must be recovered first).
+     */
     begin(kind: WriteKind, title: string): Promise<WriteSession>;
     /** Sessions whose owner is gone. */
     listStale(): Promise<WriteSessionRecord[]>;

@@ -233,30 +233,38 @@ export async function createYomitan(options: CreateYomitanOptions) {
             }
         };
 
+    /**
+     * Imports a prepared archive inside a write session. With `replace`, the installed dictionary of
+     * the same title is deleted first, in the same session, so no other writer can slip in between.
+     * A failed import removes what it wrote; if that cleanup fails too, the session is abandoned so
+     * recovery finishes it.
+     */
     const importPrepared = async (
         { reader, title }: PreparedArchive,
-        { signal, onProgress }: Omit<ImportOptions, 'source'>,
+        { signal, onProgress, replace = false }: Omit<ImportOptions, 'source'> & { replace?: boolean },
     ): Promise<InstalledDictionary> => {
         let session: Awaited<ReturnType<typeof storage.sessions.begin>>;
         try {
             throwIfAborted(signal);
+            await recoverWriteSessions(storage, storage.sessions);
             session = await storage.sessions.begin('import', title);
         } catch (error) {
             await reader.close?.();
             throw error;
         }
+        const guarded = storage.withWriteGuard(async () => {
+            await session.guard();
+            throwIfAborted(signal);
+        });
         let installed: InstalledDictionary;
         try {
-            // Checked inside the exclusive session: a duplicate is refused before anything is written,
-            // so the installed dictionary is never touched by the failure cleanup below.
-            if (await storage.dictionaryExists(title)) {
+            if (replace) {
+                await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
+            } else if (await storage.dictionaryExists(title)) {
+                // Refused before anything is written, so cleanup never touches the installed dictionary.
                 await reader.close?.();
                 throw new DictionaryImportError([new Error(`Dictionary ${title} is already imported, skipped it.`)]);
             }
-            const guarded = storage.withWriteGuard(async () => {
-                await session.guard();
-                throwIfAborted(signal);
-            });
             let outcome: Awaited<ReturnType<typeof importDictionaryArchive>>;
             try {
                 outcome = await importDictionaryArchive(guarded, reader, {
@@ -269,7 +277,12 @@ export async function createYomitan(options: CreateYomitanOptions) {
             const { result, errors } = outcome;
             if (errors.length > 0 || result === null || signal?.aborted) {
                 // Atomic import: remove whatever was written (a listed deviation from upstream).
-                await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
+                try {
+                    await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
+                } catch (cleanupError) {
+                    session.abandon();
+                    throw cleanupError;
+                }
                 if (signal?.aborted) {
                     throw new YomitanAbortError();
                 }
@@ -292,6 +305,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
         title: string,
         onProgress?: (progress: { processed: number; count: number }) => void,
     ) => {
+        await recoverWriteSessions(storage, storage.sessions);
         const session = await storage.sessions.begin('delete', title);
         try {
             const report = safely(onProgress);
@@ -415,9 +429,9 @@ export async function createYomitan(options: CreateYomitanOptions) {
                         new Error(`The update for ${title} contains a different dictionary (${prepared.title})`),
                     ]);
                 }
-                // Upstream's importer validates every bank before writing; run it that far first, so a
-                // broken update never costs the installed version.
-                const validationErrors = await validateDictionaryArchive(prepared.reader);
+                // Run upstream's whole import against storage that discards writes (validation, media,
+                // styles, conversion), so a broken update never costs the installed version.
+                const validationErrors = await validateDictionaryArchive(prepared.reader, options.imageInfoReader);
                 if (validationErrors.length > 0) {
                     await prepared.reader.close?.();
                     throw new DictionaryImportError(validationErrors);
@@ -425,8 +439,8 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 throwIfAborted(signal);
                 const index = profile.options.dictionaries.findIndex(({ name }) => name === title);
                 const settings = index >= 0 ? clone(profile.options.dictionaries[index]) : null;
-                await deleteDictionary(title);
-                const result = await importPrepared(prepared, { signal, onProgress });
+                // Past this point the replacement is committed to: aborting would lose both versions.
+                const result = await importPrepared(prepared, { onProgress, replace: true });
                 if (settings !== null) {
                     const current = profile.options.dictionaries.findIndex(({ name }) => name === result.title);
                     if (current >= 0) {

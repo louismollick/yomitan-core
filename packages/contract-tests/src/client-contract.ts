@@ -318,6 +318,47 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             await client.dispose();
         });
 
+        test('an update with a missing image keeps the installed dictionary (full dry run)', async ({ expect }) => {
+            const files = readFixtureDictionaryFiles('valid-dictionary1');
+            const updatable = {
+                ...JSON.parse(files['index.json'] as string),
+                isUpdatable: true,
+                indexUrl: 'https://example.test/index.json',
+                downloadUrl: 'https://example.test/d.zip',
+            };
+            files['index.json'] = JSON.stringify(updatable);
+            const brokenArchive = await zipFiles({
+                ...files,
+                'index.json': JSON.stringify({ ...updatable, revision: 'test2' }),
+            });
+            // A schema-valid archive that references an image it does not contain fails only during media
+            // loading, after upstream's first write.
+            const withoutImage = await zipFiles(
+                Object.fromEntries(
+                    Object.entries({
+                        ...files,
+                        'index.json': JSON.stringify({ ...updatable, revision: 'test2' }),
+                    }).filter(([name]) => name !== 'image.gif'),
+                ),
+            );
+            const client = await createYomitan({
+                storage: await createStorage(),
+                fetch: async (url) =>
+                    url.endsWith('index.json')
+                        ? jsonResponse({ ...updatable, revision: 'test2' })
+                        : { ok: true, status: 200, json: async () => ({}), arrayBuffer: async () => withoutImage },
+                archiveReaders: { directory: () => createFilesArchiveReader(files) },
+            });
+            await client.dictionaries.import({ source: { directory: 'main' } });
+            await expect(client.dictionaries.update(TITLE)).rejects.toBeInstanceOf(DictionaryImportError);
+            expect((await client.dictionaries.list()).map(({ title, revision }) => [title, revision])).toEqual([
+                [TITLE, 'test'],
+            ]);
+            expect(client.profile.get().options.dictionaries.map(({ name }) => name)).toEqual([TITLE]);
+            expect((await client.lookup.terms('打ち込む')).entries.length).toBeGreaterThan(0);
+            await client.dispose();
+        });
+
         test('updates keep the dictionary position and settings in the profile', async ({ expect }) => {
             const archive = await createDictionaryArchive('valid-dictionary1', { level: 6 });
             const files = readFixtureDictionaryFiles('valid-dictionary1');

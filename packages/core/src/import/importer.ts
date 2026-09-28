@@ -89,30 +89,38 @@ export async function importDictionaryArchive(
     }
 }
 
-class ValidationComplete extends Error {}
-
 /**
- * Runs upstream's importer up to its first write: the index, every data bank's schema and the
- * minimum version are validated, nothing is stored. Used before replacing an installed dictionary.
- * Relies on upstream validating all banks before adding the summary row.
+ * Runs upstream's whole import against storage that discards every write: the index, every data
+ * bank's schema, conversion, media loading and styles are all checked, nothing is stored. Used
+ * before replacing an installed dictionary.
  */
-export async function validateDictionaryArchive(reader: ArchiveReader): Promise<Error[]> {
-    const dryRun = {
+export async function validateDictionaryArchive(
+    reader: ArchiveReader,
+    imageInfoReader?: ImageInfoReader,
+): Promise<Error[]> {
+    const discard = {
         isPrepared: () => true,
         dictionaryExists: async () => false,
-        addWithResult: async () => {
-            throw new ValidationComplete();
-        },
+        bulkAdd: async () => {},
+        bulkUpdate: async () => {},
+        addWithResult: async () => ({
+            result: 1,
+            set onsuccess(callback: (() => void) | null) {
+                if (typeof callback === 'function') {
+                    void Promise.resolve().then(callback);
+                }
+            },
+            set onerror(_callback: unknown) {},
+        }),
     };
     try {
-        const { errors } = await importDictionaryArchive(dryRun as unknown as DictionaryStorage, {
-            entries: () => reader.entries(),
-        });
-        return errors.length > 0 ? errors : [new Error('The archive has no data to import')];
+        const { result, errors } = await importDictionaryArchive(
+            discard as unknown as DictionaryStorage,
+            { entries: () => reader.entries() },
+            { imageInfoReader },
+        );
+        return errors.length > 0 ? errors : result === null ? [new Error('The archive could not be imported')] : [];
     } catch (error) {
-        if (error instanceof ValidationComplete) {
-            return [];
-        }
         return [error instanceof Error ? error : new Error(String(error))];
     }
 }

@@ -327,11 +327,10 @@ export class SqlWriteSessions implements WriteSessionStore {
         const owner = createSessionId();
         const record: WriteSessionRecord = { id: createSessionId(), kind, title, startedAt: this.now() };
         await this.backend.transaction(async () => {
-            const live = await driver.all<{ id: string }>(
-                'SELECT id FROM yomitan_write_sessions WHERE heartbeatAt > ?',
-                [this.now() - this.staleAfterMs],
-            );
-            if (live.length > 0) {
+            // Stale sessions count too: they must be recovered first, or recovery could later delete
+            // rows this session writes under the same title.
+            const existing = await driver.all<{ id: string }>('SELECT id FROM yomitan_write_sessions');
+            if (existing.length > 0) {
                 throw new StorageBusyError();
             }
             await driver.run(
