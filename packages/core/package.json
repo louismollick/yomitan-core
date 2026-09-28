@@ -50,6 +50,7 @@
     "hermes-compiler": "^250829098.0.14",
     "jsdom": "^25.0.1",
     "kanji-processor": "^1.0.2",
+    "linkedom": "^0.18.10",
     "parse5": "^7.2.1",
     "yomitan-handlebars": "git+https://github.com/yomidevs/yomitan-handlebars.git#12aff5e3550954d7d3a98a5917ff7d579f3cce25"
   }
