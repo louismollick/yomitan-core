@@ -1,0 +1,57 @@
+{
+  "name": "yomitan-core",
+  "version": "2.0.0",
+  "description": "Headless Yomitan: dictionary import, lookup, rendering and Anki notes for browsers, Node and React Native.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/louismollick/yomitan-core.git",
+    "directory": "packages/core"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "sync-upstream": "node scripts/sync-upstream.mjs",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit && tsc -p test/consumer-types",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/runtime": "^7.29.7",
+    "@react-native/babel-preset": "^0.86.0",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^22.20.4",
+    "@zip.js/zip.js": "^2.7.54",
+    "acorn": "^8.18.0",
+    "acorn-globals": "^7.0.1",
+    "acorn-walk": "^8.3.5",
+    "ajv": "^8.17.1",
+    "esbuild": "^0.25.1",
+    "fake-indexeddb": "^6.0.0",
+    "handlebars": "^4.7.8",
+    "hangul-js": "^0.2.6",
+    "hermes-compiler": "^250829098.0.14",
+    "jsdom": "^25.0.1",
+    "kanji-processor": "^1.0.2",
+    "parse5": "^7.2.1",
+    "tsdown": "^0.15.0",
+    "yomitan-handlebars": "git+https://github.com/yomidevs/yomitan-handlebars.git#12aff5e3550954d7d3a98a5917ff7d579f3cce25"
+  }
+}

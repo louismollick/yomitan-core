@@ -39,6 +39,17 @@
         }
     },
     "files": {
-        "ignore": ["dist/**", "node_modules/**", "*.json"]
+        "ignore": [
+            "**/dist/**",
+            "**/node_modules/**",
+            "*.json",
+            "**/src/upstream/**",
+            "**/.upstream-cache/**",
+            "**/fixtures/upstream/**",
+            "**/generated/**",
+            "**/test/hermes/react-native-prelude.js",
+            "**/src/upstream-overrides/**",
+            "**/scripts/lib/**"
+        ]
     }
 }
