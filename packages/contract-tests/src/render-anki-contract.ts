@@ -6,7 +6,12 @@
  */
 
 import { describe, test } from 'vitest';
-import type { AnkiNote, AnkiNoteInfo, AnkiTransport } from '../../core/src/anki/anki';
+import {
+    type AnkiNote,
+    type AnkiNoteInfo,
+    type AnkiTransport,
+    createAnkiConnectTransport,
+} from '../../core/src/anki/anki';
 import { type Yomitan, createYomitan } from '../../core/src/client/yomitan';
 import { DuplicateNoteError, createDisplayController } from '../../core/src/display/display-controller';
 import type { CreateClientStorage } from './client-contract';
@@ -227,6 +232,72 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             expect(note.fields.Glossary).not.toContain('<script');
             expect(note.fields.Glossary).not.toContain('javascript:');
             expect(note.fields.Glossary).toContain('title="&quot;><img src=x onerror=alert(1)>"');
+            await client.dispose();
+        });
+
+        test('dictionary CSS stays inside its scope and its style element', async ({ expect }) => {
+            const client = await importedClient(createStorage);
+            const profile = client.profile.get();
+            profile.options.dictionaries[0].styles =
+                '.gloss { color: red; }\n} .action-button { display: none } /*\n.x { content: "</style><img src=x onerror=alert(1)>"; }';
+            await client.profile.set(profile);
+            const css = await client.render.css();
+            expect(css).toContain('.gloss { color: red; }');
+            expect(css).not.toContain('.action-button { display: none }');
+            expect(css).not.toContain('</style');
+            const { entries } = await client.lookup.terms('打ち込む');
+            profile.options.dictionaries[0].styles = '.x { content: "</style><img src=x onerror=alert(1)>"; }';
+            await client.profile.set(profile);
+            await withTermCardFormat(client, { Glossary: '{glossary}' });
+            const { note } = await client.anki.buildNote(entries[0]);
+            expect(note.fields.Glossary).toContain('<style>');
+            expect(note.fields.Glossary).not.toContain('</style><img');
+            await client.dispose();
+        });
+
+        test('app marker values are literal text', async ({ expect }) => {
+            const client = await importedClient(createStorage);
+            await withTermCardFormat(client, { Source: '{series}' });
+            const { entries } = await client.lookup.terms('打ち込む');
+            const series = 'ACME $& $$ {expression} {{glossary}}';
+            const { note } = await client.anki.buildNote(entries[0], { extraMarkers: { series } });
+            expect(note.fields.Source).toBe(series);
+            expect(note.deckName).toBe(`Mining::${series}`);
+            expect(note.tags).toEqual(['yomitan', series]);
+            await client.dispose();
+        });
+
+        test('overwrite is unavailable when the transport cannot read notes', async ({ expect }) => {
+            const client = await importedClient(createStorage);
+            await withTermCardFormat(client, { Word: '{expression}' }, { duplicateBehavior: 'overwrite' });
+            const { transport } = createFakeAnki();
+            transport.notesInfo = undefined;
+            const controller = createDisplayController(client, { anki: transport });
+            const { entries } = await client.lookup.terms('打ち込む');
+            await transport.addNote((await client.anki.buildNote(entries[0])).note);
+            const [states] = await controller.getNoteStates([entries[0]]);
+            expect(states.cardFormats[0]).toMatchObject({ action: 'disabled' });
+            await client.dispose();
+        });
+
+        test('each AnkiConnect transport uses its own fetch', async ({ expect }) => {
+            const calls: string[] = [];
+            const makeFetch = (label: string) => async (_url: string, init?: object) => {
+                const { action } = JSON.parse((init as { body: string }).body);
+                calls.push(`${label}:${action}`);
+                return {
+                    ok: true,
+                    status: 200,
+                    text: async () => JSON.stringify(action === 'version' ? 6 : ['Default']),
+                };
+            };
+            const client = await createYomitan({ storage: await createStorage(), fetch: makeFetch('client') as never });
+            const a = createAnkiConnectTransport({ fetch: makeFetch('a') as never });
+            const b = createAnkiConnectTransport({ fetch: makeFetch('b') as never });
+            await a.getDeckNames();
+            await b.getDeckNames();
+            expect(calls.filter((call) => call.endsWith(':deckNames'))).toEqual(['a:deckNames', 'b:deckNames']);
+            expect(calls.every((call) => !call.startsWith('client:'))).toBe(true);
             await client.dispose();
         });
 

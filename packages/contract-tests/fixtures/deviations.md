@@ -15,3 +15,5 @@ Intentional differences from upstream behaviour at the pinned commit. An unliste
 | Structured-content links | Allowed schemes enforced by the import schema only | Also enforced at render time (`http(s)` and internal links) | Prebuilt databases skip import validation |
 | Popup kanji stroke-order font | Bundled | Not bundled by default (18 MB) | Size; web consumers can supply it |
 | Translator fixtures phrased as options | n/a | Run at the internal translator seam; the public path is covered by profile-mapping goldens | Plan §4 |
+| Dictionary CSS in the popup | Parsed by the CSSOM, then nested under `[data-dictionary]` | Reduced to balanced rules first (same splitter), so a stray `}` can't leave the scope | No CSSOM outside browsers; the string output must be safe on its own |
+| `<` in dictionary CSS | Kept | Written as the CSS escape `\3c ` in popup and Anki `<style>` output | Keeps `</style>` from ending the style element |

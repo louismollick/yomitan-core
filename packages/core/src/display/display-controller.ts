@@ -70,7 +70,11 @@ function getCardFormatIndices(options: ProfileOptions, entry: DictionaryEntry): 
     return indices;
 }
 
-function getSaveAction(behavior: string, state: NoteState): { action: SaveAction; reason: string | null } {
+function getSaveAction(
+    behavior: string,
+    state: NoteState,
+    canReadNotes: boolean,
+): { action: SaveAction; reason: string | null } {
     if (!state.canAdd) {
         return { action: 'disabled', reason: 'The note is missing required field content' };
     }
@@ -81,6 +85,10 @@ function getSaveAction(behavior: string, state: NoteState): { action: SaveAction
         case 'prevent':
             return { action: 'disabled', reason: 'Duplicate notes are disabled' };
         case 'overwrite':
+            if (!canReadNotes) {
+                // Overwriting merges with the existing fields, which needs `notesInfo`.
+                return { action: 'disabled', reason: 'This Anki connection cannot read notes to overwrite them' };
+            }
             return state.duplicateNoteIds.some((id) => id !== -1)
                 ? { action: 'overwrite', reason: null }
                 : { action: 'disabled', reason: 'The duplicate note could not be found' };
@@ -134,7 +142,11 @@ export function createDisplayController(client: DisplayControllerClient, { anki 
                 cardFormats: notes.map(({ cardFormatIndex, errors }) => {
                     const state = states[offset++];
                     const format = options.anki.cardFormats[cardFormatIndex];
-                    const { action, reason } = getSaveAction(options.anki.duplicateBehavior, state);
+                    const { action, reason } = getSaveAction(
+                        options.anki.duplicateBehavior,
+                        state,
+                        anki.notesInfo !== undefined,
+                    );
                     return {
                         cardFormatIndex,
                         name: format.name,

@@ -556,7 +556,9 @@ export async function createYomitan(options: CreateYomitanOptions) {
         render: {
             /**
              * Entries as Yomitan's popup markup. Style it with `css()` and put `attributes()` on the
-             * element that stands in for Yomitan's document root.
+             * element that stands in for Yomitan's document root. Dictionary links to other lookups
+             * are `yomitan://lookup/search.html?query=…` anchors; hosts intercept that navigation (for
+             * example a WebView's `onShouldStartLoadWithRequest`) and run the lookup themselves.
              */
             html(
                 entries: DictionaryEntry[],

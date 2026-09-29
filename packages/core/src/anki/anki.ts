@@ -9,7 +9,9 @@
  */
 
 import { StringDocument, createStringWindow } from '../dom/string-dom';
+import { type Fetch, startWithUpstreamEnv } from '../platform/upstream-env';
 import type { ProfileOptions } from '../profile/profile';
+import { escapeCssForStyleElement, sanitizeCssWithoutCssom } from '../render/display-options';
 import type { Summary } from '../storage/types';
 import { AnkiConnect } from '../upstream/ext/js/comm/anki-connect.js';
 import { fetchText } from '../upstream/ext/js/core/fetch-utilities.js';
@@ -52,7 +54,12 @@ export interface AnkiTransport {
     guiBrowseNotes?(noteIds: number[]): Promise<unknown>;
 }
 
-export type AnkiConnectOptions = { server?: string; apiKey?: string | null };
+export type AnkiConnectOptions = {
+    server?: string;
+    apiKey?: string | null;
+    /** Used for AnkiConnect requests. Defaults to the global `fetch`. */
+    fetch?: Fetch;
+};
 
 type UpstreamAnkiConnect = AnkiTransport & {
     enabled: boolean;
@@ -64,9 +71,16 @@ type UpstreamAnkiConnect = AnkiTransport & {
     getModelFieldNames(model: string): Promise<string[]>;
 };
 
-/** Yomitan's AnkiConnect client. Requests go through the client's `fetch`. */
+/** Yomitan's AnkiConnect client. Requests go through `options.fetch`, or the global `fetch`. */
 export function createAnkiConnectTransport(options: AnkiConnectOptions = {}) {
-    const connection = new AnkiConnect() as unknown as UpstreamAnkiConnect;
+    const connection = new AnkiConnect() as unknown as UpstreamAnkiConnect & {
+        _invoke(action: string, params: unknown): Promise<unknown>;
+    };
+    // Bound per transport, so clients with different fetches never share one.
+    const fetch =
+        options.fetch ?? ((...args: Parameters<Fetch>) => (globalThis as unknown as { fetch: Fetch }).fetch(...args));
+    const invoke = connection._invoke.bind(connection);
+    connection._invoke = (action, params) => startWithUpstreamEnv({ fetch }, () => invoke(action, params));
     connection.server = options.server ?? 'http://127.0.0.1:8765';
     connection.apiKey = options.apiKey ?? null;
     connection.enabled = true;
@@ -117,47 +131,11 @@ type NoteBuilder = {
     getDictionaryStylesMap(dictionaries: ProfileOptions['dictionaries']): Map<string, string>;
 };
 
-/**
- * What upstream's `sanitizeCSS` (CSSStyleSheet.replaceSync + re-serialize) does that matters, for
- * runtimes without a CSSOM: comments are removed, `@import` rules are dropped (replaceSync ignores
- * them), and anything after an unbalanced brace is discarded. Whitespace is not normalized the way a
- * browser's serializer would (listed deviation).
- */
-export function sanitizeCssWithoutCssom(css: string): string {
-    const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    const rules: string[] = [];
-    let depth = 0;
-    let start = 0;
-    let quote: string | null = null;
-    for (let i = 0; i < source.length; ++i) {
-        const char = source[i];
-        if (quote !== null) {
-            if (char === '\\') {
-                ++i;
-            } else if (char === quote) {
-                quote = null;
-            }
-            continue;
-        }
-        if (char === '"' || char === "'") {
-            quote = char;
-        } else if (char === '{') {
-            ++depth;
-        } else if (char === '}') {
-            if (--depth < 0) {
-                break;
-            }
-            if (depth === 0) {
-                rules.push(source.slice(start, i + 1).trim());
-                start = i + 1;
-            }
-        } else if (char === ';' && depth === 0) {
-            // Statement at-rules such as @import or @charset: dropped.
-            start = i + 1;
-        }
-    }
-    return rules.filter((rule) => rule.length > 0 && !/^@import\b/i.test(rule)).join('\n');
-}
+/** Private-use stand-ins for braces in app marker values while field templates render. */
+const OPEN_BRACE = '\uf8f0';
+const CLOSE_BRACE = '\uf8f1';
+const OPEN_BRACE_PATTERN = /\uf8f0/g;
+const CLOSE_BRACE_PATTERN = /\uf8f1/g;
 
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -235,6 +213,10 @@ export class AnkiNotes {
                           .filter(({ styles }) => typeof styles === 'string')
                           .map(({ name, styles }) => [name, sanitizeCssWithoutCssom(styles as string)]),
                   );
+        // The glossary template puts these in a <style> element; `<` never needs to be literal in CSS.
+        for (const [name, css] of dictionaryStylesMap) {
+            dictionaryStylesMap.set(name, escapeCssForStyleElement(css));
+        }
         const { note, errors } = await builder.createNote({
             dictionaryEntry: entry,
             cardFormat,
@@ -256,6 +238,9 @@ export class AnkiNotes {
             requirements: [],
             dictionaryStylesMap,
         });
+        for (const [name, value] of Object.entries(note.fields)) {
+            note.fields[name] = value.replace(OPEN_BRACE_PATTERN, '{').replace(CLOSE_BRACE_PATTERN, '}');
+        }
         return { note, errors };
     }
 
@@ -270,7 +255,7 @@ export class AnkiNotes {
         const replace = (text: string) => {
             let result = text;
             for (const [name, markerValue] of Object.entries(extraMarkers)) {
-                result = result.replace(new RegExp(`\\{${escapeRegExp(name)}\\}`, 'g'), markerValue);
+                result = result.replace(new RegExp(`\\{${escapeRegExp(name)}\\}`, 'g'), () => markerValue);
             }
             return result;
         };
@@ -289,9 +274,17 @@ export class AnkiNotes {
         if (Object.keys(markers).length === 0) {
             return cardFormat;
         }
+        // Field values are marker templates: braces in app values are hidden from the marker parser and
+        // restored after the note is built, so a value like `{glossary}` stays literal text.
+        const protectedMarkers = Object.fromEntries(
+            Object.entries(markers).map(([name, value]) => [
+                name,
+                value.replace(/\{/g, OPEN_BRACE).replace(/\}/g, CLOSE_BRACE),
+            ]),
+        );
         const fields: typeof cardFormat.fields = {};
         for (const [name, field] of Object.entries(cardFormat.fields)) {
-            fields[name] = { ...field, value: this.substitute(field.value, markers) };
+            fields[name] = { ...field, value: this.substitute(field.value, protectedMarkers) };
         }
         return { ...cardFormat, deck: this.substitute(cardFormat.deck, markers), fields };
     }

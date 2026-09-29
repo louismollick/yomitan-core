@@ -80,13 +80,65 @@ export function addScopeToCss(css: string, scopeSelector: string): string {
     return `${scopeSelector} {${css}\n}`;
 }
 
-/** The profile's custom popup CSS plus each enabled dictionary's styles, scoped to its entries. */
+/**
+ * What upstream's `sanitizeCSS` (CSSStyleSheet.replaceSync + re-serialize) does that matters, for
+ * runtimes without a CSSOM: comments are removed, `@import` rules are dropped (replaceSync ignores
+ * them), and anything after an unbalanced brace is discarded. Whitespace is not normalized the way a
+ * browser's serializer would (listed deviation).
+ */
+export function sanitizeCssWithoutCssom(css: string): string {
+    const source = css.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, '');
+    const rules: string[] = [];
+    let depth = 0;
+    let start = 0;
+    let quote: string | null = null;
+    for (let i = 0; i < source.length; ++i) {
+        const char = source[i];
+        if (quote !== null) {
+            if (char === '\\') {
+                ++i;
+            } else if (char === quote) {
+                quote = null;
+            }
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+        } else if (char === '{') {
+            ++depth;
+        } else if (char === '}') {
+            if (--depth < 0) {
+                break;
+            }
+            if (depth === 0) {
+                rules.push(source.slice(start, i + 1).trim());
+                start = i + 1;
+            }
+        } else if (char === ';' && depth === 0) {
+            // Statement at-rules such as @import or @charset: dropped.
+            start = i + 1;
+        }
+    }
+    return rules.filter((rule) => rule.length > 0 && !/^@import\b/i.test(rule)).join('\n');
+}
+
+/** CSS safe inside a `<style>` element: `<` becomes the CSS escape `\\3c `, so `</style>` can't end it. */
+export function escapeCssForStyleElement(css: string): string {
+    return css.replace(/</g, '\\3c ');
+}
+
+/**
+ * The profile's custom popup CSS plus each enabled dictionary's styles, scoped to its entries.
+ * Dictionary styles are reduced to balanced rules first: upstream parses them with the browser's
+ * CSSOM, so a stray `}` can't close the scope rule and style the rest of the page.
+ */
 export function getCustomCss(options: ProfileOptions): string {
     let customCss = options.general.customPopupCss;
     for (const { name, enabled, styles = '' } of options.dictionaries) {
         if (enabled) {
             const escapedTitle = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            customCss += `\n${addScopeToCss(styles, `[data-dictionary="${escapedTitle}"]`)}`;
+            const scoped = addScopeToCss(sanitizeCssWithoutCssom(styles), `[data-dictionary="${escapedTitle}"]`);
+            customCss += `\n${escapeCssForStyleElement(scoped)}`;
         }
     }
     return customCss;

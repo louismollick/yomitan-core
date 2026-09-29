@@ -5,7 +5,7 @@
 
 import { upstreamAssets } from '../upstream/assets.js';
 
-type Fetch = (input: string, init?: object) => Promise<unknown>;
+export type Fetch = (input: string, init?: object) => Promise<unknown>;
 
 /**
  * Browser and extension globals that vendored Yomitan modules reference. The sync script rewrites
@@ -109,4 +109,17 @@ export function withUpstreamEnv<T>(overrides: Partial<UpstreamEnv>, fn: () => T)
     } finally {
         Object.assign(upstreamEnv, previous);
     }
+}
+
+/**
+ * Runs an async upstream function with `overrides` applied while it starts, i.e. until its first
+ * `await`. Enough for upstream code that reads a global synchronously before awaiting, such as
+ * `AnkiConnect._invoke` calling `fetch`.
+ */
+export function startWithUpstreamEnv<T>(overrides: Partial<UpstreamEnv>, fn: () => Promise<T>): Promise<T> {
+    let promise: Promise<T> | undefined;
+    withUpstreamEnv(overrides, () => {
+        promise = fn();
+    });
+    return promise as Promise<T>;
 }
