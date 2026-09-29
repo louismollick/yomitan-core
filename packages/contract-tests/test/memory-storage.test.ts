@@ -6,6 +6,7 @@ import { recoverWriteSessions } from '../../core/src/storage/sessions';
 import type { StorageBackend } from '../../core/src/storage/types';
 import {
     createDictionaryArchive,
+    importFixture,
     readFixtureDictionaryFiles,
     runClientContract,
     runGeneratedGoldens,
@@ -60,12 +61,14 @@ test('memory: recovery removes a dictionary after replacement deletion fails', a
         };
 
         await expect(client.dictionaries.update(TITLE)).rejects.toBe(failure);
-        expect(await backend.count('terms', 'dictionary', TITLE)).toBe(0);
-        expect(await storage.getDictionaryInfo()).toMatchObject([{ title: TITLE, importSuccess: true }]);
+        // The summary goes first, so the half-deleted dictionary is no longer listed as intact.
+        expect(await storage.getDictionaryInfo()).toEqual([]);
+        expect(await backend.count('termMeta', 'dictionary', TITLE)).toBeGreaterThan(0);
         expect(await storage.sessions.listStale()).toMatchObject([{ title: TITLE }]);
 
         await recoverWriteSessions(storage, storage.sessions);
         expect(await client.dictionaries.list()).toEqual([]);
+        expect(await backend.count('termMeta', 'dictionary', TITLE)).toBe(0);
     } finally {
         backend.deleteWhere = deleteWhere;
         await client.dispose();
@@ -83,5 +86,16 @@ test('memory: recovery keeps an installed dictionary when a same-title import di
     expect(await recoverWriteSessions(storage, storage.sessions)).toEqual([]);
     expect((await client.dictionaries.list()).map(({ title }) => title)).toEqual(['Test Dictionary']);
     expect(await storage.sessions.listStale()).toEqual([]);
+    await client.dispose();
+});
+
+test('memory: recovery keeps a replacement that finished before its session ended', async ({ expect }) => {
+    const storage = createMemoryStorage();
+    const client = await createYomitan({ storage });
+    const session = await storage.sessions.begin('replace', 'Test Dictionary');
+    await importFixture(storage.withWriteGuard(session.guard), await createDictionaryArchive('valid-dictionary1'));
+    session.abandon();
+    expect(await recoverWriteSessions(storage, storage.sessions)).toEqual([]);
+    expect((await client.dictionaries.list()).map(({ title }) => title)).toEqual(['Test Dictionary']);
     await client.dispose();
 });

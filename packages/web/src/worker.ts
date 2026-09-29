@@ -161,6 +161,13 @@ export function exposeYomitan(endpoint: MessageEndpoint, yomitan: Yomitan): () =
                 ++ack.count;
                 endpoint.postMessage({ type: 'progress', id, value } satisfies Response);
             };
+            const waitForProgressAcks = async () => {
+                if (ack.count > 0) {
+                    await new Promise<void>((resolve) => {
+                        ack.resolve = resolve;
+                    });
+                }
+            };
             try {
                 if (!METHODS.has(path)) throw new Error(`Unknown Yomitan method: ${path}`);
                 const [group, method] = path.split('.');
@@ -177,21 +184,13 @@ export function exposeYomitan(endpoint: MessageEndpoint, yomitan: Yomitan): () =
                         ...(args[index] as object | undefined),
                         signal: controller.signal,
                         onProgress: progress,
+                        beforeFinish: waitForProgressAcks,
                     };
                 } else if (path === 'dictionaries.delete') {
                     args[1] = progress;
                 }
                 const value = await owner[method ?? 'dispose'](...args);
-                if (ack.count > 0)
-                    await new Promise<void>((resolve) => {
-                        ack.resolve = resolve;
-                    });
-                // A cancel that raced a finished import still wins, as it does in-process (the import
-                // added a new dictionary only). Updates and deletes past their commit point report success.
-                if (controller.signal.aborted && path === 'dictionaries.import') {
-                    await yomitan.dictionaries.delete((value as { title: string }).title);
-                    throw new YomitanAbortError();
-                }
+                await waitForProgressAcks();
                 const profile = PROFILE_WRITES.has(path) ? yomitan.profile.get() : undefined;
                 endpoint.postMessage({ type: 'result', id, value, profile } satisfies Response, transferables(value));
             } catch (error) {

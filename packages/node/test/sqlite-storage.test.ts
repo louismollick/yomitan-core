@@ -12,6 +12,7 @@ import {
     recoverWriteSessions,
 } from 'yomitan-core';
 import { readFixtureDictionaryFiles } from '../../contract-tests/src/index';
+import type { StorageBackend } from '../../core/src/storage/types';
 import { compactDatabase, createNodeStorage } from '../src/index';
 
 const TITLE = 'Test Dictionary';
@@ -148,10 +149,14 @@ describe('SQLite write sessions', () => {
         await owner.prepare();
         await recoverer.prepare();
 
-        // The owner replaces through its guarded view, then stalls (a suspended app, a killed process).
-        // Recovery finishes a replace; a plain import that completed would be kept.
-        const session = await owner.sessions.begin('replace', TITLE);
-        await importFixture(owner.withWriteGuard(session.guard) as ReturnType<typeof createNodeStorage>);
+        // The owner starts deleting through its guarded view: the summary goes first, then it stalls
+        // (a suspended app, a killed process) with the data rows still there.
+        const installing = await owner.sessions.begin('import', TITLE);
+        await importFixture(owner.withWriteGuard(installing.guard) as ReturnType<typeof createNodeStorage>);
+        await installing.end();
+        const session = await owner.sessions.begin('delete', TITLE);
+        const { backend } = owner as unknown as { backend: StorageBackend };
+        await backend.deleteWhere('dictionaries', 'title', TITLE, session.guard);
         expect(await recoverer.sessions.listLiveTitles()).toEqual(new Set([TITLE]));
         expect(await recoverWriteSessions(recoverer, recoverer.sessions)).toEqual([]);
 

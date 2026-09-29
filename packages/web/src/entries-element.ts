@@ -81,6 +81,7 @@ export class YomitanEntriesElement extends HTMLElement {
     private readonly styleElement: HTMLStyleElement;
     private objectUrls: string[] = [];
     private renderToken = 0;
+    private renderPending = false;
 
     constructor() {
         super();
@@ -111,14 +112,21 @@ export class YomitanEntriesElement extends HTMLElement {
     }
 
     connectedCallback(): void {
-        if (this.client !== null && this.entryList.length > 0) {
+        if (this.client !== null && (this.renderPending || this.entryList.length > 0)) {
             void this.render();
         }
     }
 
-    /** Renders the current entries; resolves once markup, images and Anki buttons are in place. */
+    /**
+     * Renders the current entries; resolves once markup, images and Anki buttons are in place. A
+     * detached element waits until it is connected, so it never holds image URLs nothing will revoke.
+     */
     async render(): Promise<void> {
         const token = ++this.renderToken;
+        this.renderPending = !this.isConnected;
+        if (this.renderPending) {
+            return;
+        }
         const client = this.client;
         if (client === null) {
             throw new Error('<yomitan-entries> needs a `client` before it can render');
