@@ -206,6 +206,11 @@ export function exposeYomitan(endpoint: MessageEndpoint, yomitan: Yomitan): () =
     return () => {
         endpoint.removeEventListener('message', listener);
         for (const controller of active.values()) controller.abort();
+        // No acknowledgement can arrive any more; an import waiting for one would hold its write lock.
+        for (const ack of progressAcks.values()) {
+            ack.count = 0;
+            ack.resolve?.();
+        }
     };
 }
 

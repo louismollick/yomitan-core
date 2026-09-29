@@ -50,6 +50,28 @@ describe('worker protocol', () => {
         await shared.close();
     });
 
+    test('tearing down the host mid-import releases the write lock', async () => {
+        const storage = createStorage();
+        const host = await createYomitan({ storage });
+        const channel = new MessageChannel();
+        const stop = exposeYomitan(channel.port1 as unknown as MessageEndpoint, host);
+        // A caller that receives progress but never acknowledges it, then goes away.
+        const port = channel.port2 as unknown as MessageEndpoint;
+        const progressed = new Promise<void>((resolve) => {
+            port.addEventListener('message', ((event: MessageEvent) => {
+                if (event.data.type === 'progress') resolve();
+            }) as EventListener);
+        });
+        port.start?.();
+        const source = await createDictionaryArchive('valid-dictionary1');
+        port.postMessage({ type: 'call', id: 1, path: 'dictionaries.import', args: [{ source }] });
+        await progressed;
+        stop();
+        await expect.poll(async () => (await storage.sessions.listLiveTitles()).size, { timeout: 10_000 }).toBe(0);
+        await host.dispose();
+        channel.port1.close();
+    });
+
     test('cancels an import after progress and preserves the empty dictionary list', async () => {
         const client = await makeWorkerClient({ storage: createStorage() });
         const abort = new AbortController();
