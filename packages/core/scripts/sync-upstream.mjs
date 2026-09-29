@@ -219,7 +219,7 @@ for (const file of config.css ?? []) {
         throw new Error(`${file} still references an extension-relative URL`);
     }
     const moduleFile = `${file}.js`;
-    fs.mkdirSync(path.dirname(path.join(outDir, moduleFile)), {recursive: true});
+    fs.mkdirSync(path.dirname(path.join(outDir, moduleFile)), { recursive: true });
     fs.writeFileSync(path.join(outDir, moduleFile), `${HEADER}export default ${JSON.stringify(css)};\n`);
     assetEntries.push([`/${file.replace(/^ext\//, '')}`, `./${moduleFile}`]);
 }

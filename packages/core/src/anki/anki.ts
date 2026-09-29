@@ -31,7 +31,10 @@ export type AnkiNote = {
     options: Record<string, unknown>;
 };
 
-export type AnkiNoteInfo = { noteId: number; fields: Record<string, { value: string; order: number }> } & Record<string, unknown>;
+export type AnkiNoteInfo = { noteId: number; fields: Record<string, { value: string; order: number }> } & Record<
+    string,
+    unknown
+>;
 
 /**
  * How notes reach Anki. `createAnkiConnectTransport` talks to AnkiConnect; apps can supply their own
@@ -198,7 +201,9 @@ export class AnkiNotes {
     /** The markers a field can use for this entry type, including per-dictionary ones. */
     getMarkers(type: 'term' | 'kanji', options: ProfileOptions, dictionaryInfo: Summary[]): string[] {
         const standard = getStandardFieldMarkers(type, options.general.language) as string[];
-        return type === 'term' ? [...standard, ...(getDynamicFieldMarkers(options.dictionaries, dictionaryInfo) as string[])] : standard;
+        return type === 'term'
+            ? [...standard, ...(getDynamicFieldMarkers(options.dictionaries, dictionaryInfo) as string[])]
+            : standard;
     }
 
     /** Upstream `DisplayAnki._getAnkiFieldTemplates`: the profile's templates plus dynamic ones. */
@@ -307,7 +312,11 @@ function stripToFirstField(note: AnkiNote): AnkiNote {
 }
 
 /** Upstream `Backend.partitionAddibleNotes` + `_onApiGetAnkiNoteInfo`. */
-export async function getNoteStates(transport: AnkiTransport, notes: AnkiNote[], fetchNoteInfo: boolean): Promise<NoteState[]> {
+export async function getNoteStates(
+    transport: AnkiTransport,
+    notes: AnkiNote[],
+    fetchNoteInfo: boolean,
+): Promise<NoteState[]> {
     const stripped = notes.map(stripToFirstField);
     const noDuplicates = stripped.map((note) => ({ ...note, options: { ...note.options, allowDuplicate: false } }));
     let isDuplicate: boolean[];
@@ -315,7 +324,9 @@ export async function getNoteStates(transport: AnkiTransport, notes: AnkiNote[],
     if (transport.canAddNotesWithErrorDetail !== undefined) {
         try {
             const details = await transport.canAddNotesWithErrorDetail(noDuplicates);
-            isDuplicate = details.map(({ error }) => error !== null && error.includes('cannot create note because it is a duplicate'));
+            isDuplicate = details.map(({ error }) =>
+                (error ?? '').includes('cannot create note because it is a duplicate'),
+            );
             usedErrorDetail = true;
         } catch (error) {
             if (!(error instanceof Error && error.message.includes('unsupported action'))) {
@@ -348,7 +359,9 @@ export async function getNoteStates(transport: AnkiTransport, notes: AnkiNote[],
         }
         const knownIds = duplicateNoteIds.filter((id) => id !== INVALID_NOTE_ID);
         const noteInfos =
-            fetchNoteInfo && knownIds.length > 0 && transport.notesInfo !== undefined ? await transport.notesInfo(knownIds) : [];
+            fetchNoteInfo && knownIds.length > 0 && transport.notesInfo !== undefined
+                ? await transport.notesInfo(knownIds)
+                : [];
         states.push({ canAdd: valid, valid, duplicateNoteIds, noteInfos });
     }
     return states;

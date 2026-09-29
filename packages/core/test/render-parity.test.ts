@@ -39,8 +39,17 @@ async function renderAll() {
     for (const data of tests) {
         const entries =
             data.func === 'findTerms'
-                ? (await translator.findTerms(data.mode, data.text, createFindTermsOptions(DICTIONARY, optionsPresets, data.options))).dictionaryEntries
-                : await translator.findKanji(data.text, createFindKanjiOptions(DICTIONARY, optionsPresets, data.options));
+                ? (
+                      await translator.findTerms(
+                          data.mode,
+                          data.text,
+                          createFindTermsOptions(DICTIONARY, optionsPresets, data.options),
+                      )
+                  ).dictionaryEntries
+                : await translator.findKanji(
+                      data.text,
+                      createFindKanjiOptions(DICTIONARY, optionsPresets, data.options),
+                  );
         for (const [i, entry] of entries.entries()) {
             pairs.push({
                 name: `${data.name} #${i}`,

@@ -22,7 +22,10 @@ const DICTIONARY = 'Test Dictionary 2';
 describe('Anki parity (upstream anki-note-builder and note-data goldens)', async () => {
     const storage = createMemoryStorage();
     await storage.prepare();
-    const { result } = await importFixture(storage, await createDictionaryArchive('valid-dictionary1', { title: DICTIONARY }));
+    const { result } = await importFixture(
+        storage,
+        await createDictionaryArchive('valid-dictionary1', { title: DICTIONARY }),
+    );
     const styles = result?.styles ?? '';
     const translator = new Translator(storage);
     translator.prepare();
@@ -44,7 +47,13 @@ describe('Anki parity (upstream anki-note-builder and note-data goldens)', async
         const isTerms = data.func === 'findTerms';
         const mode = isTerms ? data.mode : 'split';
         const entries = isTerms
-            ? (await translator.findTerms(mode, data.text, createFindTermsOptions(DICTIONARY, optionsPresets, data.options))).dictionaryEntries
+            ? (
+                  await translator.findTerms(
+                      mode,
+                      data.text,
+                      createFindTermsOptions(DICTIONARY, optionsPresets, data.options),
+                  )
+              ).dictionaryEntries
             : await translator.findKanji(data.text, createFindKanjiOptions(DICTIONARY, optionsPresets, data.options));
         if (mode === 'simple') {
             expect(fields.results).toBeNull();
@@ -56,10 +65,23 @@ describe('Anki parity (upstream anki-note-builder and note-data goldens)', async
             createAnkiNoteData('{marker}', {
                 dictionaryEntry: entry,
                 resultOutputMode: mode,
-                cardFormat: { type: 'term', name: 'test', deck: 'deck', model: 'model', fields: {}, icon: 'big-circle' },
+                cardFormat: {
+                    type: 'term',
+                    name: 'test',
+                    deck: 'deck',
+                    model: 'model',
+                    fields: {},
+                    icon: 'big-circle',
+                },
                 glossaryLayoutMode: 'default',
                 compactTags: false,
-                context: { url: 'url:', sentence: { text: '', offset: 0 }, documentTitle: 'title', query: 'query', fullQuery: 'fullQuery' },
+                context: {
+                    url: 'url:',
+                    sentence: { text: '', offset: 0 },
+                    documentTitle: 'title',
+                    query: 'query',
+                    fullQuery: 'fullQuery',
+                },
                 media: {},
                 dictionaryStylesMap,
             }),
@@ -68,19 +90,40 @@ describe('Anki parity (upstream anki-note-builder and note-data goldens)', async
 
         const results = [];
         for (const entry of entries) {
-            const source = entry.type === 'kanji' ? entry.character : (entry.headwords[0]?.sources[0]?.originalText ?? '');
+            const source =
+                entry.type === 'kanji' ? entry.character : (entry.headwords[0]?.sources[0]?.originalText ?? '');
             const cardFields: Record<string, unknown> = {};
             for (const marker of getStandardFieldMarkers(entry.type)) {
                 cardFields[marker] = { value: `{${marker}}`, overwriteMode: 'coalesce' };
             }
             const builder = new (AnkiNoteBuilder as any)(
-                { injectAnkiNoteMedia: async () => { throw new Error('Not supported'); }, parseText: async () => { throw new Error('Not supported'); } },
+                {
+                    injectAnkiNoteMedia: async () => {
+                        throw new Error('Not supported');
+                    },
+                    parseText: async () => {
+                        throw new Error('Not supported');
+                    },
+                },
                 renderer.templateRenderer,
             );
             const { note, errors } = await builder.createNote({
                 dictionaryEntry: entry,
-                cardFormat: { type: entry.type, name: 'test', deck: 'deckName', model: 'modelName', fields: cardFields, icon: 'big-circle' },
-                context: { url: 'url:', sentence: { text: `cloze-prefix${source}cloze-suffix`, offset: 'cloze-prefix'.length }, documentTitle: 'title', query: 'query', fullQuery: 'fullQuery' },
+                cardFormat: {
+                    type: entry.type,
+                    name: 'test',
+                    deck: 'deckName',
+                    model: 'modelName',
+                    fields: cardFields,
+                    icon: 'big-circle',
+                },
+                context: {
+                    url: 'url:',
+                    sentence: { text: `cloze-prefix${source}cloze-suffix`, offset: 'cloze-prefix'.length },
+                    documentTitle: 'title',
+                    query: 'query',
+                    fullQuery: 'fullQuery',
+                },
                 template,
                 tags: ['yomitan'],
                 duplicateScope: 'collection',

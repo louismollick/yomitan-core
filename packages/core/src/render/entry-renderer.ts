@@ -7,7 +7,13 @@
  * strings (Node, WebViews, React Native previews).
  */
 
-import { NODE_TYPES, StringDOMParser, StringDocument, StringDocumentFragment, createStringWindow } from '../dom/string-dom';
+import {
+    NODE_TYPES,
+    StringDOMParser,
+    StringDocument,
+    StringDocumentFragment,
+    createStringWindow,
+} from '../dom/string-dom';
 import { type UpstreamEnv, withUpstreamEnv } from '../platform/upstream-env';
 import type { Summary } from '../storage/types';
 import { fetchText } from '../upstream/ext/js/core/fetch-utilities.js';
@@ -15,7 +21,10 @@ import { DisplayGenerator } from '../upstream/ext/js/display/display-generator.j
 import type { KanjiDictionaryEntry, TermDictionaryEntry } from '../upstream/types/ext/dictionary';
 
 /** The globals DisplayGenerator and its helpers use. */
-export type DomEnvironment = Pick<UpstreamEnv, 'document' | 'window' | 'Node' | 'DocumentFragment' | 'DOMParser' | 'NodeFilter'>;
+export type DomEnvironment = Pick<
+    UpstreamEnv,
+    'document' | 'window' | 'Node' | 'DocumentFragment' | 'DOMParser' | 'NodeFilter'
+>;
 
 const NODE_FILTER = { SHOW_ALL: 0xffffffff, SHOW_ELEMENT: 0x1, SHOW_TEXT: 0x4 };
 
@@ -87,7 +96,10 @@ export class EntryRenderer<TElement = unknown> {
         this.generator = generator;
     }
 
-    static async create<TElement = unknown>(env: DomEnvironment, options: { onLink?: LinkHandler } = {}): Promise<EntryRenderer<TElement>> {
+    static async create<TElement = unknown>(
+        env: DomEnvironment,
+        options: { onLink?: LinkHandler } = {},
+    ): Promise<EntryRenderer<TElement>> {
         templatesHtml ??= fetchText('/templates-display.html');
         const html = await templatesHtml;
         const generator = withUpstreamEnv(env, () => {
@@ -118,7 +130,9 @@ export class EntryRenderer<TElement = unknown> {
     }
 
     render(entry: TermDictionaryEntry | KanjiDictionaryEntry, dictionaryInfo: Summary[]): TElement {
-        return entry.type === 'kanji' ? this.renderKanji(entry, dictionaryInfo) : this.renderTerm(entry, dictionaryInfo);
+        return entry.type === 'kanji'
+            ? this.renderKanji(entry, dictionaryInfo)
+            : this.renderTerm(entry, dictionaryInfo);
     }
 }
 
@@ -131,7 +145,13 @@ type ElementLike = {
     style: { setProperty(name: string, value: string): void; removeProperty(name: string): string };
 };
 
-export type GlossImage<T extends ElementLike = ElementLike> = { link: T; image: T; background: T | null; dictionary: string; path: string };
+export type GlossImage<T extends ElementLike = ElementLike> = {
+    link: T;
+    image: T;
+    background: T | null;
+    dictionary: string;
+    path: string;
+};
 
 /** Every dictionary image (`a.gloss-image-link` with its `img.gloss-image`) in rendered entries. */
 export function findGlossImages<T extends ElementLike>(root: T): GlossImage<T>[] {
@@ -141,7 +161,13 @@ export function findGlossImages<T extends ElementLike>(root: T): GlossImage<T>[]
         const dictionary = link.getAttribute('data-dictionary');
         const path = link.getAttribute('data-path');
         if (image !== null && dictionary !== null && path !== null) {
-            results.push({ link, image, background: link.querySelector('.gloss-image-background') as T | null, dictionary, path });
+            results.push({
+                link,
+                image,
+                background: link.querySelector('.gloss-image-background') as T | null,
+                dictionary,
+                path,
+            });
         }
     }
     return results;

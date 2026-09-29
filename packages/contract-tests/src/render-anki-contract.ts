@@ -20,13 +20,19 @@ async function importedClient(createStorage: CreateClientStorage): Promise<Yomit
     return client;
 }
 
-async function withTermCardFormat(client: Yomitan, fields: Record<string, string>, extra: Record<string, unknown> = {}) {
+async function withTermCardFormat(
+    client: Yomitan,
+    fields: Record<string, string>,
+    extra: Record<string, unknown> = {},
+) {
     const profile = client.profile.get();
     profile.options.anki.cardFormats[0] = {
         ...profile.options.anki.cardFormats[0],
         deck: 'Mining::{series}',
         model: 'Basic',
-        fields: Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, { value, overwriteMode: 'coalesce' }])),
+        fields: Object.fromEntries(
+            Object.entries(fields).map(([name, value]) => [name, { value, overwriteMode: 'coalesce' }]),
+        ),
     } as never;
     profile.options.anki.tags = ['yomitan', '{series}'];
     Object.assign(profile.options.anki, extra);
@@ -38,7 +44,8 @@ export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolea
     const notes = new Map<number, AnkiNote>();
     let nextId = 1;
     const firstFieldKey = (note: AnkiNote) => `${note.modelName}\u0000${Object.values(note.fields)[0] ?? ''}`;
-    const isDuplicate = (note: AnkiNote) => [...notes.values()].some((existing) => firstFieldKey(existing) === firstFieldKey(note));
+    const isDuplicate = (note: AnkiNote) =>
+        [...notes.values()].some((existing) => firstFieldKey(existing) === firstFieldKey(note));
     const browsed: number[][] = [];
     const transport: AnkiTransport = {
         async addNote(note) {
@@ -57,7 +64,11 @@ export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolea
             return list.map((note) => (note.options.allowDuplicate === true ? true : !isDuplicate(note)));
         },
         async findNoteIds(list) {
-            return list.map((note) => [...notes.entries()].filter(([, existing]) => firstFieldKey(existing) === firstFieldKey(note)).map(([id]) => id));
+            return list.map((note) =>
+                [...notes.entries()]
+                    .filter(([, existing]) => firstFieldKey(existing) === firstFieldKey(note))
+                    .map(([id]) => id),
+            );
         },
         async notesInfo(ids) {
             return ids.map((id) => {
@@ -65,7 +76,9 @@ export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolea
                 if (note === undefined) {
                     return null;
                 }
-                const fields = Object.fromEntries(Object.entries(note.fields).map(([name, value], order) => [name, { value, order }]));
+                const fields = Object.fromEntries(
+                    Object.entries(note.fields).map(([name, value], order) => [name, { value, order }]),
+                );
                 return { noteId: id, fields } as AnkiNoteInfo;
             });
         },
@@ -99,7 +112,9 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             expect(placeholder).not.toMatch(/<img[^>]*src=/);
             const inlined = await client.render.html(entries, { media: 'data-uri' });
             expect(inlined).toContain('src="data:image/gif;base64,R0lGOD');
-            const templated = await client.render.html(entries, { media: { urlTemplate: 'app://m/{dictionary}/{path}' } });
+            const templated = await client.render.html(entries, {
+                media: { urlTemplate: 'app://m/{dictionary}/{path}' },
+            });
             expect(templated).toContain('src="app://m/Test%20Dictionary/image.gif"');
             await client.dispose();
         });
@@ -179,7 +194,19 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             ];
             await storage.bulkAdd(
                 'terms',
-                [{ expression: '悪', reading: 'あく', definitionTags: '', rules: '', score: 0, glossary, dictionary: 'Evil', expressionReverse: '悪', readingReverse: 'くあ' }],
+                [
+                    {
+                        expression: '悪',
+                        reading: 'あく',
+                        definitionTags: '',
+                        rules: '',
+                        score: 0,
+                        glossary,
+                        dictionary: 'Evil',
+                        expressionReverse: '悪',
+                        readingReverse: 'くあ',
+                    },
+                ],
                 0,
                 1,
             );
@@ -226,12 +253,20 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             const second = await controller.addNote(entry, 0);
             expect(second.noteId).not.toBe(first.noteId);
 
-            await withTermCardFormat(client, { Word: '{expression}', Meaning: '{glossary-brief}' }, { duplicateBehavior: 'prevent' });
+            await withTermCardFormat(
+                client,
+                { Word: '{expression}', Meaning: '{glossary-brief}' },
+                { duplicateBehavior: 'prevent' },
+            );
             [states] = await controller.getNoteStates([entry]);
             expect(states.cardFormats[0]).toMatchObject({ action: 'disabled', reason: 'Duplicate notes are disabled' });
             await expect(controller.addNote(entry, 0)).rejects.toBeInstanceOf(DuplicateNoteError);
 
-            await withTermCardFormat(client, { Word: '{expression}', Meaning: '{glossary-brief}' }, { duplicateBehavior: 'overwrite' });
+            await withTermCardFormat(
+                client,
+                { Word: '{expression}', Meaning: '{glossary-brief}' },
+                { duplicateBehavior: 'overwrite' },
+            );
             const existing = notes.get(first.noteId);
             if (existing !== undefined) {
                 existing.fields.Meaning = '';
@@ -242,7 +277,9 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             await client.dispose();
         });
 
-        test('the display controller falls back without error details and browsing (AnkiConnect Android)', async ({ expect }) => {
+        test('the display controller falls back without error details and browsing (AnkiConnect Android)', async ({
+            expect,
+        }) => {
             const client = await importedClient(createStorage);
             await withTermCardFormat(client, { Word: '{expression}' });
             const { transport } = createFakeAnki({ errorDetail: false, browse: false });

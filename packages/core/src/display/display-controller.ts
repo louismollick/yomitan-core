@@ -90,7 +90,11 @@ function getSaveAction(behavior: string, state: NoteState): { action: SaveAction
 }
 
 export function createDisplayController(client: DisplayControllerClient, { anki }: { anki: AnkiTransport }) {
-    const buildNotes = async (entry: DictionaryEntry, context: AnkiNoteContext, extraMarkers?: Record<string, string>) => {
+    const buildNotes = async (
+        entry: DictionaryEntry,
+        context: AnkiNoteContext,
+        extraMarkers?: Record<string, string>,
+    ) => {
         const options = client.profile.get().options;
         const indices = getCardFormatIndices(options, entry);
         return await Promise.all(
@@ -114,8 +118,16 @@ export function createDisplayController(client: DisplayControllerClient, { anki 
             const options = client.profile.get().options;
             const built = await Promise.all(entries.map((entry) => buildNotes(entry, context, extraMarkers)));
             const flat = built.flat();
-            const fetchInfo = options.anki.duplicateBehavior === 'overwrite' || options.anki.displayTagsAndFlags !== 'never';
-            const states = flat.length === 0 ? [] : await getNoteStates(anki, flat.map(({ note }) => note), fetchInfo);
+            const fetchInfo =
+                options.anki.duplicateBehavior === 'overwrite' || options.anki.displayTagsAndFlags !== 'never';
+            const states =
+                flat.length === 0
+                    ? []
+                    : await getNoteStates(
+                          anki,
+                          flat.map(({ note }) => note),
+                          fetchInfo,
+                      );
             let offset = 0;
             return built.map((notes, entryIndex) => ({
                 entryIndex,

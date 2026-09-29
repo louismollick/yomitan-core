@@ -558,7 +558,10 @@ export async function createYomitan(options: CreateYomitanOptions) {
              * Entries as Yomitan's popup markup. Style it with `css()` and put `attributes()` on the
              * element that stands in for Yomitan's document root.
              */
-            html(entries: DictionaryEntry[], { media = 'placeholder' }: { media?: HtmlMediaMode } = {}): Promise<string> {
+            html(
+                entries: DictionaryEntry[],
+                { media = 'placeholder' }: { media?: HtmlMediaMode } = {},
+            ): Promise<string> {
                 assertUsable();
                 return renderEntriesHtml(entries, media);
             },

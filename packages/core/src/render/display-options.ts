@@ -69,7 +69,10 @@ function camelToKebab(name: string): string {
 
 /** The same attributes as `data-*` attribute names. */
 export function getDisplayAttributeEntries(options: ProfileOptions, context?: ThemeContext): [string, string][] {
-    return Object.entries(getDisplayAttributes(options, context)).map(([key, value]) => [`data-${camelToKebab(key)}`, value]);
+    return Object.entries(getDisplayAttributes(options, context)).map(([key, value]) => [
+        `data-${camelToKebab(key)}`,
+        value,
+    ]);
 }
 
 /** Upstream's `addScopeToCss`: CSS nesting under a scope selector. */

@@ -12,7 +12,12 @@ import { type ThemeContext, getCustomCss, getDisplayAttributeEntries, getFontSty
 import { findGlossImages, setGlossImageSource } from './entry-renderer';
 
 /** The stylesheets Yomitan's popup page loads, in its order. */
-const POPUP_STYLESHEETS = ['/css/material.css', '/css/display.css', '/css/display-pronunciation.css', '/css/structured-content.css'];
+const POPUP_STYLESHEETS = [
+    '/css/material.css',
+    '/css/display.css',
+    '/css/display-pronunciation.css',
+    '/css/structured-content.css',
+];
 
 let popupCss: Promise<string> | null = null;
 
@@ -30,7 +35,10 @@ export function getPopupCss(): Promise<string> {
  */
 export type HtmlMediaMode = 'placeholder' | 'data-uri' | { urlTemplate: string };
 
-export type MediaLoader = (dictionary: string, path: string) => Promise<{ mediaType: string; content: Uint8Array } | null>;
+export type MediaLoader = (
+    dictionary: string,
+    path: string,
+) => Promise<{ mediaType: string; content: Uint8Array } | null>;
 
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -62,9 +70,13 @@ export async function resolveImages(root: StringElement, mode: HtmlMediaMode, lo
             continue;
         }
         const media = await loadMedia(dictionary, path);
-        setGlossImageSource(glossImage, media === null ? null : `data:${media.mediaType};base64,${encodeBase64(media.content)}`, {
-            linkToImage: false,
-        });
+        setGlossImageSource(
+            glossImage,
+            media === null ? null : `data:${media.mediaType};base64,${encodeBase64(media.content)}`,
+            {
+                linkToImage: false,
+            },
+        );
     }
 }
 
@@ -73,7 +85,11 @@ function escapeAttribute(value: string): string {
 }
 
 /** A standalone HTML document showing entries as Yomitan's popup would (for WebViews and previews). */
-export async function renderHtmlDocument(entriesHtml: string, options: ProfileOptions, context: ThemeContext = {}): Promise<string> {
+export async function renderHtmlDocument(
+    entriesHtml: string,
+    options: ProfileOptions,
+    context: ThemeContext = {},
+): Promise<string> {
     const attributes = getDisplayAttributeEntries(options, context)
         .map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`)
         .join('');

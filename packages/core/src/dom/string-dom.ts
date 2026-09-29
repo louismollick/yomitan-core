@@ -352,7 +352,10 @@ export class StringStyle {
             const name = declaration.slice(0, colon).trim();
             const propertyValue = declaration.slice(colon + 1).trim();
             if (name.length > 0 && propertyValue.length > 0) {
-                this.properties.set(name.startsWith('--') ? name : name.toLowerCase(), normalizeStyleValue(propertyValue));
+                this.properties.set(
+                    name.startsWith('--') ? name : name.toLowerCase(),
+                    normalizeStyleValue(propertyValue),
+                );
             }
         }
         this.sync();
@@ -391,7 +394,10 @@ export class StringStyle {
                 const name = declaration.slice(0, colon).trim();
                 const propertyValue = declaration.slice(colon + 1).trim();
                 if (name.length > 0 && propertyValue.length > 0) {
-                    this.properties.set(name.startsWith('--') ? name : name.toLowerCase(), normalizeStyleValue(propertyValue));
+                    this.properties.set(
+                        name.startsWith('--') ? name : name.toLowerCase(),
+                        normalizeStyleValue(propertyValue),
+                    );
                 }
             }
         }
@@ -487,10 +493,7 @@ class StringClassList {
     }
 
     remove(...tokens: string[]): void {
-        this.element.setAttribute(
-            'class',
-            this.tokens.filter((token) => !tokens.includes(token)).join(' '),
-        );
+        this.element.setAttribute('class', this.tokens.filter((token) => !tokens.includes(token)).join(' '));
     }
 
     toggle(token: string, force?: boolean): boolean {
@@ -546,7 +549,10 @@ export class StringElement extends StringParentNode {
         this.localName = namespaceURI === HTML_NAMESPACE ? localName.toLowerCase() : localName;
         this.namespaceURI = namespaceURI;
         this.content =
-            this.localName === 'template' && namespaceURI === HTML_NAMESPACE ? new StringDocumentFragment(ownerDocument) : null;
+            this.localName === 'template' && namespaceURI === HTML_NAMESPACE
+                ? new StringDocumentFragment(ownerDocument)
+                : null;
+        // biome-ignore lint/correctness/noConstructorReturn: the proxy reflects attributes as properties, as browsers do
         return new Proxy(this, {
             get(target, property, receiver) {
                 if (typeof property === 'string') {
@@ -706,7 +712,11 @@ function escapeAttribute(value: string): string {
 function serializeNode(node: StringNode): string {
     if (node instanceof StringText) {
         const parent = node.parentNode;
-        if (parent instanceof StringElement && parent.namespaceURI === HTML_NAMESPACE && RAW_TEXT_ELEMENTS.has(parent.localName)) {
+        if (
+            parent instanceof StringElement &&
+            parent.namespaceURI === HTML_NAMESPACE &&
+            RAW_TEXT_ELEMENTS.has(parent.localName)
+        ) {
             return node.data;
         }
         return escapeText(node.data);

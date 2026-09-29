@@ -93,7 +93,13 @@ export {
     type EntryNoteStates,
     type SaveAction,
 } from './display/display-controller';
-export { type ThemeContext, addScopeToCss, getCustomCss, getDisplayAttributes, getFontStyle } from './render/display-options';
+export {
+    type ThemeContext,
+    addScopeToCss,
+    getCustomCss,
+    getDisplayAttributes,
+    getFontStyle,
+} from './render/display-options';
 export {
     type DomEnvironment,
     EntryRenderer,

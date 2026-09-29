@@ -84,7 +84,9 @@ async function main(): Promise<void> {
         Pitch: { value: '{pitch-accent-graphs}', overwriteMode: 'coalesce' },
     } as never;
     await client.profile.set(profile);
-    const { note, errors: noteErrors } = await client.anki.buildNote((await client.lookup.terms('打ち込む')).entries[0]);
+    const { note, errors: noteErrors } = await client.anki.buildNote(
+        (await client.lookup.terms('打ち込む')).entries[0],
+    );
     print(
         `__SMOKE_CLIENT__${JSON.stringify({
             range: scan?.range,
@@ -92,7 +94,11 @@ async function main(): Promise<void> {
             parse: parse.map((token) => token.text),
             recommended: recommended.length > 0,
             html: html.includes('class="entry"') && html.includes('src="data:image/gif;base64,'),
-            note: { word: note.fields.Word, glossary: note.fields.Glossary.startsWith('<div'), errors: noteErrors.length },
+            note: {
+                word: note.fields.Word,
+                glossary: note.fields.Glossary.startsWith('<div'),
+                errors: noteErrors.length,
+            },
         })}`,
     );
     await client.dispose();
