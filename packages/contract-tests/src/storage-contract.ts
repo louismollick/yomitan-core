@@ -7,8 +7,9 @@
  */
 
 import { describe, test } from 'vitest';
+import { createZipArchiveReader } from '../../core/src/import/archive';
+import { importDictionaryArchive } from '../../core/src/import/importer';
 import type { DictionaryStorage } from '../../core/src/storage/types';
-import { DictionaryImporter } from '../../core/src/upstream/ext/js/dictionary/dictionary-importer.js';
 import { createDictionaryArchive, readUpstreamJson } from './fixtures';
 
 export type CreateStorage = () => Promise<DictionaryStorage> | DictionaryStorage;
@@ -43,14 +44,27 @@ type DatabaseTestData = {
     };
 };
 
+/**
+ * Imports with upstream's importer through a zip archive reader, and upstream's test media loader
+ * (every image reports 100×100, as in upstream's golden fixtures).
+ */
+export function importFixture(
+    storage: DictionaryStorage,
+    archive: ArrayBuffer,
+    onProgress?: (progress: { index: number; count: number }) => void,
+) {
+    return importDictionaryArchive(storage, createZipArchiveReader(archive), {
+        imageInfoReader: testMediaLoader,
+        onProgress,
+    });
+}
+
 /** Upstream's test media loader: images are not decoded. */
 export const testMediaLoader = {
     async getImageDetails(content: ArrayBuffer) {
         return { content, width: 100, height: 100 };
     },
 };
-
-const importDetails = { prefixWildcardsSupported: true, yomitanVersion: '0.0.0.0' };
 
 function countBy<T>(items: T[], key: keyof T, value: unknown): number {
     return items.reduce((count, item) => count + (item[key] === value ? 1 : 0), 0);
@@ -63,7 +77,6 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             const archive = await createDictionaryArchive('valid-dictionary1');
             const title = 'Test Dictionary';
             const titles = new Map([[title, { alias: title, allowSecondarySearches: false }]]);
-            const importDetails = { prefixWildcardsSupported: false, yomitanVersion: '0.0.0.0' };
             const notOpen = 'Database not open';
             await expect.soft(storage.deleteDictionary(title, 1000, () => {})).rejects.toThrow(notOpen);
             await expect.soft(storage.findTermsBulk(['?'], titles, 'exact')).rejects.toThrow(notOpen);
@@ -79,18 +92,14 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             await expect.soft(storage.findTagForTitle('tag', title)).rejects.toThrow(notOpen);
             await expect.soft(storage.getDictionaryInfo()).rejects.toThrow(notOpen);
             await expect.soft(storage.getDictionaryCounts([title], true)).rejects.toThrow(notOpen);
-            await expect
-                .soft(new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, importDetails))
-                .rejects.toThrow('Database is not ready');
+            await expect.soft(importFixture(storage, archive)).rejects.toThrow('Database is not ready');
             await storage.prepare();
             await expect.soft(storage.prepare()).rejects.toThrow('Database already open');
-            await new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, importDetails);
-            expect
-                .soft(await new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, importDetails))
-                .toEqual({
-                    result: null,
-                    errors: [new Error('Dictionary Test Dictionary is already imported, skipped it.')],
-                });
+            await importFixture(storage, archive);
+            expect.soft(await importFixture(storage, archive)).toEqual({
+                result: null,
+                errors: [new Error('Dictionary Test Dictionary is already imported, skipped it.')],
+            });
             await storage.close();
         });
 
@@ -160,9 +169,7 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
                 const storage = await createStorage();
                 await storage.prepare();
                 const archive = await createDictionaryArchive(name);
-                await expect
-                    .soft(new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, importDetails))
-                    .rejects.toThrow('Dictionary has invalid data');
+                await expect.soft(importFixture(storage, archive)).rejects.toThrow('Dictionary has invalid data');
                 await storage.close();
             });
         }
@@ -172,15 +179,15 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             const storage = await createStorage();
             await storage.prepare();
             let progressed = false;
-            const importer = new DictionaryImporter(
-                testMediaLoader,
+            const archive = await createDictionaryArchive('valid-dictionary1');
+            const { result, errors } = await importFixture(
+                storage,
+                archive,
                 ({ index, count }: { index: number; count: number }) => {
                     expect.soft(index <= count).toBe(true);
                     progressed = true;
                 },
             );
-            const archive = await createDictionaryArchive('valid-dictionary1');
-            const { result, errors } = await importer.importDictionary(storage, archive, importDetails);
             if (result) {
                 result.importDate = testData.expectedSummary.importDate;
             }
@@ -281,11 +288,7 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             test(`empties the database with ${clearMethod}`, async ({ expect }) => {
                 const storage = await createStorage();
                 await storage.prepare();
-                await new DictionaryImporter(testMediaLoader).importDictionary(
-                    storage,
-                    await createDictionaryArchive('valid-dictionary1'),
-                    importDetails,
-                );
+                await importFixture(storage, await createDictionaryArchive('valid-dictionary1'));
                 if (clearMethod === 'purge') {
                     await storage.purge();
                 } else {

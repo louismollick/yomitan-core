@@ -47,10 +47,25 @@ export interface DictionaryStorage {
     ): Promise<void>;
 }
 
+/**
+ * What the client needs from a storage adapter: Yomitan's query interface, write sessions for
+ * exclusive recoverable imports and deletes, and a guarded view for session writes.
+ */
+export interface YomitanStorage extends DictionaryStorage {
+    readonly sessions: import('./sessions').WriteSessionStore;
+    withWriteGuard(guard: WriteGuard): DictionaryStorage;
+}
+
 export type DictionarySet = { has(value: string): boolean };
 
-/** An IndexedDB-style key range over one index. Keys compare as strings or numbers. */
-export type KeyRange = { kind: 'only'; value: string | number } | { kind: 'bound'; lower: string; upper: string };
+/**
+ * A key range over one index. `prefix` matches keys starting with `value`, which is what upstream's
+ * IndexedDB range `[value, value + '\uffff']` selects for dictionary keys.
+ */
+export type KeyRange = { kind: 'only'; value: string | number } | { kind: 'prefix'; value: string };
+
+/** Checked atomically with a write; throws to abort it (for example when an import session was lost). */
+export type WriteGuard = () => Promise<void>;
 
 export type StoredRow = { id: number; value: Record<string, unknown> };
 
@@ -64,16 +79,19 @@ export interface StorageBackend {
     /** Deletes all data and leaves the backend open. */
     clear(): Promise<void>;
     /**
-     * Rows whose `index` field matches `range`, ordered by index key then primary key, which is the
-     * order IndexedDB returns them in.
+     * Rows whose `index` field matches `range`, ordered by index key (UTF-16 code unit order) then
+     * primary key, which is the order IndexedDB returns them in.
      */
     getAll(store: ObjectStoreName, index: string, range: KeyRange): Promise<StoredRow[]>;
     /** All rows of a store in primary key order. */
     getAllRows(store: ObjectStoreName): Promise<StoredRow[]>;
     count(store: ObjectStoreName, index?: string, value?: string): Promise<number>;
-    /** Adds rows in order and returns their primary keys. */
-    add(store: ObjectStoreName, rows: Record<string, unknown>[]): Promise<number[]>;
-    put(store: ObjectStoreName, id: number, row: Record<string, unknown>): Promise<void>;
+    /**
+     * Adds rows in order and returns their primary keys. `guard` runs first, inside the same write
+     * transaction; if it throws, nothing is written.
+     */
+    add(store: ObjectStoreName, rows: Record<string, unknown>[], guard?: WriteGuard): Promise<number[]>;
+    put(store: ObjectStoreName, id: number, row: Record<string, unknown>, guard?: WriteGuard): Promise<void>;
     /** Deletes rows whose `index` field equals `value`; returns how many were deleted. */
-    deleteWhere(store: ObjectStoreName, index: string, value: string): Promise<number>;
+    deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number>;
 }

@@ -10,10 +10,9 @@
  */
 
 import { beforeAll, describe, test } from 'vitest';
-import { DictionaryImporter } from '../../core/src/upstream/ext/js/dictionary/dictionary-importer.js';
 import { Translator } from '../../core/src/upstream/ext/js/language/translator.js';
 import { createDictionaryArchive, readUpstreamJson } from './fixtures';
-import { type CreateStorage, testMediaLoader } from './storage-contract';
+import { type CreateStorage, importFixture } from './storage-contract';
 import {
     type Preset,
     type TranslatorTestCase,
@@ -65,10 +64,7 @@ export function runTranslatorParity(
             const archive = await createDictionaryArchive('valid-dictionary1', {
                 title: TRANSLATOR_FIXTURE_DICTIONARY,
             });
-            const { errors } = await new DictionaryImporter(testMediaLoader).importDictionary(storage, archive, {
-                prefixWildcardsSupported: true,
-                yomitanVersion: '0.0.0.0',
-            });
+            const { errors } = await importFixture(storage, archive);
             if (errors.length > 0) {
                 throw new Error(`Fixture import failed: ${errors.map(String).join(', ')}`);
             }

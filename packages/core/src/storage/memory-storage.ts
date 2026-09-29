@@ -4,7 +4,8 @@
  */
 
 import { IndexedDictionaryStorage } from './indexed-storage';
-import type { KeyRange, ObjectStoreName, StorageBackend, StoredRow } from './types';
+import { InProcessWriteSessions } from './sessions';
+import type { KeyRange, ObjectStoreName, StorageBackend, StoredRow, WriteGuard } from './types';
 
 type Store = {
     rows: Map<number, Record<string, unknown>>;
@@ -74,7 +75,7 @@ class MemoryBackend implements StorageBackend {
         const matches: [string | number, number][] = [];
         for (const [id, row] of target.rows) {
             const key = row[index];
-            if (isValidKey(key) && compareKeys(key, range.lower) >= 0 && compareKeys(key, range.upper) <= 0) {
+            if (typeof key === 'string' && key.startsWith(range.value)) {
                 matches.push([key, id]);
             }
         }
@@ -97,7 +98,8 @@ class MemoryBackend implements StorageBackend {
         return this.getIndex(target, index).get(value)?.length ?? 0;
     }
 
-    async add(store: ObjectStoreName, rows: Record<string, unknown>[]): Promise<number[]> {
+    async add(store: ObjectStoreName, rows: Record<string, unknown>[], guard?: WriteGuard): Promise<number[]> {
+        await guard?.();
         const target = this.getStore(store);
         const ids: number[] = [];
         for (const row of rows) {
@@ -109,14 +111,16 @@ class MemoryBackend implements StorageBackend {
         return ids;
     }
 
-    async put(store: ObjectStoreName, id: number, row: Record<string, unknown>): Promise<void> {
+    async put(store: ObjectStoreName, id: number, row: Record<string, unknown>, guard?: WriteGuard): Promise<void> {
+        await guard?.();
         const target = this.getStore(store);
         target.rows.set(id, cloneValue(row));
         target.nextId = Math.max(target.nextId, id + 1);
         target.indexes.clear();
     }
 
-    async deleteWhere(store: ObjectStoreName, index: string, value: string): Promise<number> {
+    async deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number> {
+        await guard?.();
         const target = this.getStore(store);
         const ids = this.getIndex(target, index).get(value) ?? [];
         for (const id of ids) {
@@ -164,10 +168,18 @@ class MemoryBackend implements StorageBackend {
     }
 }
 
+export class MemoryDictionaryStorage extends IndexedDictionaryStorage {
+    readonly sessions = new InProcessWriteSessions();
+
+    constructor() {
+        super(new MemoryBackend());
+    }
+}
+
 /**
  * Dictionary storage held in memory. Useful for tests, short-lived processes, and environments
  * without a database.
  */
-export function createMemoryStorage(): IndexedDictionaryStorage {
-    return new IndexedDictionaryStorage(new MemoryBackend());
+export function createMemoryStorage(): MemoryDictionaryStorage {
+    return new MemoryDictionaryStorage();
 }

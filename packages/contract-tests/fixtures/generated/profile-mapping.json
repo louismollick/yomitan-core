@@ -1,0 +1,1356 @@
+[
+  {
+    "name": "defaults",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "",
+              {
+                "index": 0,
+                "alias": "",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": {
+          "$set": [
+            ""
+          ]
+        },
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": []
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "test-dictionary-enabled",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Test Dictionary",
+              "allowSecondarySearches": false,
+              "partsOfSpeechFilter": true,
+              "useDeinflections": true
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "dictionary-disabled",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": {
+          "$set": [
+            "Test Dictionary"
+          ]
+        },
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": []
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "merge-main-dictionary-disabled",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": {
+          "$set": [
+            "Test Dictionary"
+          ]
+        },
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": []
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": []
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "aliased-secondary",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Alias",
+                "allowSecondarySearches": true,
+                "partsOfSpeechFilter": false,
+                "useDeinflections": false
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Alias",
+                "allowSecondarySearches": true,
+                "partsOfSpeechFilter": false,
+                "useDeinflections": false
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Alias",
+                "allowSecondarySearches": true,
+                "partsOfSpeechFilter": false,
+                "useDeinflections": false
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Alias",
+                "allowSecondarySearches": true,
+                "partsOfSpeechFilter": false,
+                "useDeinflections": false
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Alias",
+              "allowSecondarySearches": true,
+              "partsOfSpeechFilter": false,
+              "useDeinflections": false
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "alphanumeric-flipped",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": true,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": true,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": true,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": true,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Test Dictionary",
+              "allowSecondarySearches": false,
+              "partsOfSpeechFilter": true,
+              "useDeinflections": true
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": true
+    }
+  },
+  {
+    "name": "text-replacements",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Test Dictionary",
+              "allowSecondarySearches": false,
+              "partsOfSpeechFilter": true,
+              "useDeinflections": true
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "text-replacements-search-original",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null,
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null,
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null,
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": null,
+        "sortFrequencyDictionaryOrder": "descending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "letter",
+        "textReplacements": [
+          null,
+          [
+            {
+              "pattern": {
+                "$regexp": "\\(([^)]*)\\)",
+                "flags": "g"
+              },
+              "replacement": ""
+            },
+            {
+              "pattern": {
+                "$regexp": "don['’]t",
+                "flags": "gi"
+              },
+              "replacement": "do not"
+            }
+          ],
+          [
+            {
+              "pattern": {
+                "$regexp": "[（(].*?[）)]",
+                "flags": "gi"
+              },
+              "replacement": ""
+            }
+          ]
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "ja",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Test Dictionary",
+              "allowSecondarySearches": false,
+              "partsOfSpeechFilter": true,
+              "useDeinflections": true
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  },
+  {
+    "name": "english-word-resolution",
+    "terms": {
+      "group": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": "Test Dictionary",
+        "sortFrequencyDictionaryOrder": "ascending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "word",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "en",
+        "useAllFrequencyDictionaries": false
+      },
+      "merge": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": "Test Dictionary",
+        "sortFrequencyDictionaryOrder": "ascending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "word",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "en",
+        "useAllFrequencyDictionaries": false
+      },
+      "split": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": "Test Dictionary",
+        "sortFrequencyDictionaryOrder": "ascending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "word",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "en",
+        "useAllFrequencyDictionaries": false
+      },
+      "simple": {
+        "matchType": "exact",
+        "deinflect": true,
+        "primaryReading": "よみ",
+        "mainDictionary": "Test Dictionary",
+        "sortFrequencyDictionary": "Test Dictionary",
+        "sortFrequencyDictionaryOrder": "ascending",
+        "removeNonJapaneseCharacters": false,
+        "searchResolution": "word",
+        "textReplacements": [
+          null
+        ],
+        "enabledDictionaryMap": {
+          "$map": [
+            [
+              "Test Dictionary",
+              {
+                "index": 0,
+                "alias": "Test Dictionary",
+                "allowSecondarySearches": false,
+                "partsOfSpeechFilter": true,
+                "useDeinflections": true
+              }
+            ]
+          ]
+        },
+        "excludeDictionaryDefinitions": null,
+        "language": "en",
+        "useAllFrequencyDictionaries": false
+      }
+    },
+    "kanji": {
+      "enabledDictionaryMap": {
+        "$map": [
+          [
+            "Test Dictionary",
+            {
+              "index": 0,
+              "alias": "Test Dictionary",
+              "allowSecondarySearches": false,
+              "partsOfSpeechFilter": true,
+              "useDeinflections": true
+            }
+          ]
+        ]
+      },
+      "removeNonJapaneseCharacters": false
+    }
+  }
+]
