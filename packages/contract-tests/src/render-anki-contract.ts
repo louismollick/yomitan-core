@@ -414,6 +414,23 @@ export function runRenderAnkiContract(
             await client.dispose();
         });
 
+        test('the display controller keeps adding possible when Anki is unreachable', async ({ expect }) => {
+            const client = await importedClient(createStorage, makeClient);
+            await withTermCardFormat(client, { Word: '{expression}' });
+            const { transport } = createFakeAnki();
+            const offline = async () => {
+                throw new Error('Anki connection failure');
+            };
+            const controller = createDisplayController(client, {
+                anki: { ...transport, canAddNotes: offline, canAddNotesWithErrorDetail: offline },
+            });
+            const { entries } = await client.lookup.terms('打ち込む');
+            const [states] = await controller.getNoteStates([entries[0]]);
+            expect(states.cardFormats[0]).toMatchObject({ action: 'add' });
+            expect(states.cardFormats[0].reason).toContain('Could not check Anki for duplicates');
+            await client.dispose();
+        });
+
         test('the display controller falls back without error details and browsing (AnkiConnect Android)', async ({
             expect,
         }) => {
