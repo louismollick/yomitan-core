@@ -134,34 +134,31 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         onProgress: DDB.DeleteDictionaryProgressCallback,
     ): Promise<void> {
         this.assertOpen();
-        const targetGroups: [ObjectStoreName, string][][] = [
-            DICTIONARY_STORES.map((store) => [store, 'dictionary']),
-            [['dictionaries', 'title']],
+        const targets: [ObjectStoreName, string][] = [
+            ['dictionaries', 'title'],
+            ...DICTIONARY_STORES.map((store): [ObjectStoreName, string] => [store, 'dictionary']),
         ];
         const progressData: DDB.DeleteDictionaryProgressData = {
             count: 0,
             processed: 0,
-            storeCount: targetGroups.reduce((total, targets) => total + targets.length, 0),
+            storeCount: targets.length,
             storesProcesed: 0,
         };
-        for (const targets of targetGroups) {
-            const counts = await Promise.all(
-                targets.map(([store, index]) => this.backend.count(store, index, dictionaryName)),
-            );
-            for (const count of counts) {
-                ++progressData.storesProcesed;
-                progressData.count += count;
-                onProgress(progressData);
-            }
-            for (let i = 0; i < targets.length; ++i) {
-                const [store, index] = targets[i];
-                const deleted = await this.backend.deleteWhere(store, index, dictionaryName, this.writeGuard);
-                for (let j = 0; j < deleted; ++j) {
-                    const processed = progressData.processed + 1;
-                    progressData.processed = processed;
-                    if (processed % progressRate === 0 || processed === progressData.count) {
-                        onProgress(progressData);
-                    }
+        const counts = await Promise.all(
+            targets.map(([store, index]) => this.backend.count(store, index, dictionaryName)),
+        );
+        for (const count of counts) {
+            ++progressData.storesProcesed;
+            progressData.count += count;
+            onProgress(progressData);
+        }
+        for (const [store, index] of targets) {
+            const deleted = await this.backend.deleteWhere(store, index, dictionaryName, this.writeGuard);
+            for (let j = 0; j < deleted; ++j) {
+                const processed = progressData.processed + 1;
+                progressData.processed = processed;
+                if (processed % progressRate === 0 || processed === progressData.count) {
+                    onProgress(progressData);
                 }
             }
         }

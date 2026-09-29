@@ -4,7 +4,7 @@
  */
 
 export { createDictionaryArchive, readUpstreamJson, upstreamFixturesDir } from './fixtures';
-export { runStorageContract, testMediaLoader, type CreateStorage } from './storage-contract';
+export { importFixture, runStorageContract, testMediaLoader, type CreateStorage } from './storage-contract';
 export { runTranslatorParity, TRANSLATOR_FIXTURE_DICTIONARY } from './translator-parity';
 export {
     type ExtraArchiveReaders,

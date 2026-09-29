@@ -12,7 +12,7 @@ import {
     type Yomitan,
     YomitanAbortError,
     createYomitan,
-} from '../../core/src/client/yomitan';
+} from 'yomitan-core';
 import { createFilesArchiveReader } from '../../core/src/import/archive';
 import type { YomitanStorage } from '../../core/src/storage/types';
 import { createDictionaryArchive, zipFiles } from './fixtures';
@@ -36,16 +36,21 @@ function jsonResponse(value: unknown) {
 async function withImported(
     createStorage: CreateClientStorage,
     options: Partial<CreateYomitanOptions> = {},
+    makeClient: (options: CreateYomitanOptions) => Promise<Yomitan> = createYomitan,
 ): Promise<Yomitan> {
-    const client = await createYomitan({ storage: await createStorage(), ...options });
+    const client = await makeClient({ storage: await createStorage(), ...options });
     await client.dictionaries.import({ source: await createDictionaryArchive('valid-dictionary1', { level: 6 }) });
     return client;
 }
 
-export function runClientContract(label: string, createStorage: CreateClientStorage): void {
+export function runClientContract(
+    label: string,
+    createStorage: CreateClientStorage,
+    makeClient: (options: CreateYomitanOptions) => Promise<Yomitan> = createYomitan,
+): void {
     describe(`${label}: client contract`, () => {
         test('imports a dictionary, enables it in the profile, and looks up terms and kanji', async ({ expect }) => {
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             const progress: number[] = [];
             const summary = await client.dictionaries.import({
                 source: await createDictionaryArchive('valid-dictionary1', { level: 6 }),
@@ -66,7 +71,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('respects the profile: disabled dictionaries, result mode and maxResults', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             const profile = client.profile.get();
             profile.options.dictionaries[0].enabled = false;
             await client.profile.set(profile);
@@ -81,7 +86,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('scans from an offset and returns the matched range and sentence', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             const text = '今日は打ち込む。明日も';
             const result = await client.lookup.scan(text, 3);
             expect(result?.range).toEqual({ start: 3, end: 7 });
@@ -92,7 +97,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('parses the whole text into tokens with ranges and furigana, across lines', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             const text = '打ち込む\n打つ';
             const tokens = await client.lookup.parse(text);
             expect(tokens.map(({ text: token, range }) => [token, range.start, range.end])).toEqual([
@@ -106,7 +111,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('deletes a dictionary and drops it from the profile', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             await client.dictionaries.delete(TITLE);
             expect(await client.dictionaries.list()).toEqual([]);
             expect(client.profile.get().options.dictionaries).toEqual([]);
@@ -115,13 +120,13 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('a failed import leaves nothing behind', async ({ expect }) => {
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             const files = readFixtureDictionaryFiles('valid-dictionary1');
             files['term_bank_1.json'] = '[["broken"]]';
             await expect(client.dictionaries.import({ source: { directory: 'unused' } })).rejects.toThrow(
                 'no directory archive reader',
             );
-            const failing = await createYomitan({
+            const failing = await makeClient({
                 storage: await createStorage(),
                 archiveReaders: { directory: () => createFilesArchiveReader(files) },
             });
@@ -134,7 +139,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('an aborted import is removed and reports AbortError', async ({ expect }) => {
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             const controller = new AbortController();
             const promise = client.dictionaries.import({
                 source: await createDictionaryArchive('valid-dictionary1'),
@@ -150,7 +155,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('importing the same dictionary twice fails without touching the installed one', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             await expect(
                 client.dictionaries.import({ source: await createDictionaryArchive('valid-dictionary1') }),
             ).rejects.toThrow('already imported');
@@ -165,9 +170,13 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             const index = JSON.parse(files['index.json'] as string);
             index.revision = undefined;
             files['index.json'] = JSON.stringify(index);
-            const client = await withImported(createStorage, {
-                archiveReaders: { directory: () => createFilesArchiveReader(files) },
-            });
+            const client = await withImported(
+                createStorage,
+                {
+                    archiveReaders: { directory: () => createFilesArchiveReader(files) },
+                },
+                makeClient,
+            );
             await expect(client.dictionaries.import({ source: { directory: 'broken' } })).rejects.toThrow(
                 'already imported',
             );
@@ -176,7 +185,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('a throwing progress listener does not break an import', async ({ expect }) => {
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             await client.dictionaries.import({
                 source: await createDictionaryArchive('valid-dictionary1'),
                 onProgress: () => {
@@ -188,7 +197,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('aborting at the last progress event still aborts the import', async ({ expect }) => {
-            const counting = await createYomitan({ storage: await createStorage() });
+            const counting = await makeClient({ storage: await createStorage() });
             let events = 0;
             await counting.dictionaries.import({
                 source: await createDictionaryArchive('valid-dictionary1'),
@@ -197,7 +206,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
                 },
             });
             await counting.dispose();
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             const controller = new AbortController();
             let seen = 0;
             await expect(
@@ -224,7 +233,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
                 downloadUrl: 'https://example.test/d.zip',
             };
             files['index.json'] = JSON.stringify(updatable);
-            const client = await createYomitan({
+            const client = await makeClient({
                 storage: await createStorage(),
                 fetch: async (url) =>
                     url.endsWith('index.json')
@@ -263,7 +272,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
                 }
                 return { ok: true, status: 200, json: async () => ({}), arrayBuffer: async () => archive };
             };
-            const client = await createYomitan({
+            const client = await makeClient({
                 storage: await createStorage(),
                 fetch,
                 archiveReaders: { directory: () => createFilesArchiveReader(files) },
@@ -279,7 +288,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             ]);
             await client.dispose();
 
-            const urlClient = await createYomitan({ storage: await createStorage(), fetch });
+            const urlClient = await makeClient({ storage: await createStorage(), fetch });
             await urlClient.dictionaries.import({ source: { url: 'https://example.test/d.zip' } });
             expect(requested).toContain('https://example.test/d.zip');
             expect((await urlClient.dictionaries.list()).map(({ title }) => title)).toEqual([TITLE]);
@@ -300,7 +309,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
                 'index.json': JSON.stringify({ ...updatable, revision: 'test2' }),
                 'term_bank_1.json': '[["x"]]',
             });
-            const client = await createYomitan({
+            const client = await makeClient({
                 storage: await createStorage(),
                 fetch: async (url) =>
                     url.endsWith('index.json')
@@ -341,7 +350,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
                     }).filter(([name]) => name !== 'image.gif'),
                 ),
             );
-            const client = await createYomitan({
+            const client = await makeClient({
                 storage: await createStorage(),
                 fetch: async (url) =>
                     url.endsWith('index.json')
@@ -371,7 +380,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
             files['index.json'] = JSON.stringify(updatable);
             const other = readFixtureDictionaryFiles('valid-dictionary1');
             other['index.json'] = JSON.stringify({ ...JSON.parse(other['index.json'] as string), title: 'Other' });
-            const client = await createYomitan({
+            const client = await makeClient({
                 storage: await createStorage(),
                 fetch: async (url) =>
                     url.endsWith('index.json')
@@ -402,7 +411,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('reports media with real image sizes', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             const media = await client.dictionaries.getMedia(TITLE, 'aosaba_auto.png');
             expect(media).toMatchObject({ mediaType: 'image/png', width: 64, height: 64 });
             expect(media?.content.byteLength).toBeGreaterThan(0);
@@ -411,7 +420,7 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('lists recommended dictionaries from Yomitan', async ({ expect }) => {
-            const client = await createYomitan({ storage: await createStorage() });
+            const client = await makeClient({ storage: await createStorage() });
             const recommended = await client.dictionaries.recommended('ja');
             expect(recommended.length).toBeGreaterThan(0);
             expect(
@@ -424,11 +433,11 @@ export function runClientContract(label: string, createStorage: CreateClientStor
         });
 
         test('restores a stored profile and migrates an old one', async ({ expect }) => {
-            const client = await withImported(createStorage);
+            const client = await withImported(createStorage, {}, makeClient);
             const stored = client.profile.get();
             stored.options.general.maxResults = 7;
             await client.dispose();
-            const restored = await createYomitan({ storage: await createStorage(), profile: stored });
+            const restored = await makeClient({ storage: await createStorage(), profile: stored });
             expect(restored.profile.get().options.general.maxResults).toBe(7);
             const defaults = await restored.profile.defaults();
             expect(defaults.version).toBeGreaterThan(0);

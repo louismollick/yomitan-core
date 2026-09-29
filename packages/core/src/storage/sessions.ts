@@ -9,7 +9,11 @@
 
 import type { DictionaryStorage, WriteGuard } from './types';
 
-export type WriteKind = 'import' | 'delete';
+/**
+ * What a session was doing. Kinds are informational: recovery keeps an intact dictionary regardless
+ * of kind, and removes everything under the title when no intact summary exists.
+ */
+export type WriteKind = 'import' | 'replace' | 'delete';
 
 export type WriteSessionRecord = {
     id: string;
@@ -79,7 +83,8 @@ export function createSessionId(): string {
 
 /**
  * Removes whatever dead sessions and interrupted imports left behind:
- *  1. every stale session is removed first (locking its owner out), then its dictionary is deleted;
+ *  1. every stale session is claimed first (locking its owner out), then its dictionary is kept if
+ *     its summary is intact or deleted otherwise;
  *  2. any dictionary whose summary still says `importSuccess: false` and that has no live session is
  *     an interrupted import (for example if recovery itself crashed after step 1) and is deleted too.
  */
@@ -94,6 +99,13 @@ export async function recoverWriteSessions(
             continue;
         }
         try {
+            const keep = (await storage.getDictionaryInfo()).some(
+                ({ title, importSuccess }) => title === stale.title && importSuccess !== false,
+            );
+            if (keep) {
+                await claimed.end();
+                continue;
+            }
             await storage.withWriteGuard(claimed.guard).deleteDictionary(stale.title, 1000, () => {});
         } catch (error) {
             claimed.abandon();

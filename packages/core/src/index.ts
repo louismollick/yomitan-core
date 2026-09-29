@@ -68,6 +68,7 @@ export {
 } from './client/yomitan';
 export type { FindTermsDetails, FindTermsMode } from './lookup/find-options';
 export type { ParseHeadword, ParseSegment, ParseToken, ScanResult, TextRange } from './lookup/text-lookup';
+export { sentenceAt } from './lookup/text-lookup';
 export type { Sentence } from './lookup/text-source';
 export type { DictionaryOptions, Profile, ProfileOptions } from './profile/profile';
 export type { KanjiDictionaryEntry, TermDictionaryEntry } from './upstream/types/ext/dictionary';

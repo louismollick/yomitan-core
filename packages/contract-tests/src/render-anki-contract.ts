@@ -6,21 +6,19 @@
  */
 
 import { describe, test } from 'vitest';
-import {
-    type AnkiNote,
-    type AnkiNoteInfo,
-    type AnkiTransport,
-    createAnkiConnectTransport,
-} from '../../core/src/anki/anki';
-import { type Yomitan, createYomitan } from '../../core/src/client/yomitan';
+import { type CreateYomitanOptions, type Yomitan, createAnkiConnectTransport, createYomitan } from 'yomitan-core';
+import type { AnkiNote, AnkiNoteInfo, AnkiTransport } from '../../core/src/anki/anki';
 import { DuplicateNoteError, createDisplayController } from '../../core/src/display/display-controller';
 import type { CreateClientStorage } from './client-contract';
 import { createDictionaryArchive } from './fixtures';
 
 const TITLE = 'Test Dictionary';
 
-async function importedClient(createStorage: CreateClientStorage): Promise<Yomitan> {
-    const client = await createYomitan({ storage: await createStorage() });
+async function importedClient(
+    createStorage: CreateClientStorage,
+    makeClient: (options: CreateYomitanOptions) => Promise<Yomitan>,
+): Promise<Yomitan> {
+    const client = await makeClient({ storage: await createStorage() });
     await client.dictionaries.import({ source: await createDictionaryArchive('valid-dictionary1') });
     return client;
 }
@@ -104,10 +102,14 @@ export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolea
     return { transport, notes, browsed };
 }
 
-export function runRenderAnkiContract(label: string, createStorage: CreateClientStorage): void {
+export function runRenderAnkiContract(
+    label: string,
+    createStorage: CreateClientStorage,
+    makeClient: (options: CreateYomitanOptions) => Promise<Yomitan> = createYomitan,
+): void {
     describe(`${label}: rendering and Anki`, () => {
         test('renders entries as Yomitan popup markup, with images resolved as asked', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             const { entries } = await client.lookup.terms('画像');
             expect(entries.length).toBeGreaterThan(0);
             const placeholder = await client.render.html(entries);
@@ -125,7 +127,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('renders a standalone document with the popup CSS and root attributes', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             const { entries } = await client.lookup.terms('打つ');
             const profile = client.profile.get();
             profile.options.general.popupTheme = 'dark';
@@ -140,7 +142,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('lists markers including per-dictionary ones', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             const markers = await client.anki.markers('term');
             expect(markers).toContain('glossary');
             expect(markers).toContain('cloze-body');
@@ -150,7 +152,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('builds notes from the profile card format, with sentence context and app markers', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, {
                 Word: '{expression}',
                 Glossary: '{single-glossary-test-dictionary}',
@@ -216,7 +218,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
                 1,
             );
             await storage.close();
-            const client = await createYomitan({ storage: await (async () => storage)() });
+            const client = await makeClient({ storage: await (async () => storage)() });
             await client.profile.syncDictionaries();
             const { entries } = await client.lookup.terms('悪');
             expect(entries).toHaveLength(1);
@@ -236,7 +238,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('dictionary CSS stays inside its scope and its style element', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             const profile = client.profile.get();
             profile.options.dictionaries[0].styles =
                 '.gloss { color: red; }\n} .action-button { display: none } /*\n.x { content: "</style><img src=x onerror=alert(1)>"; }';
@@ -256,7 +258,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('app marker values are literal text', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, { Source: '{series}' });
             const { entries } = await client.lookup.terms('打ち込む');
             const series = 'ACME $& $$ {expression} {{glossary}} {volume}';
@@ -319,7 +321,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
                 1,
             );
             await storage.close();
-            const client = await createYomitan({ storage });
+            const client = await makeClient({ storage });
             await client.profile.syncDictionaries();
             const html = await client.render.html((await client.lookup.terms('悪')).entries);
             expect(html).toContain('data-sc-ok="yes"');
@@ -331,7 +333,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('overwrite is unavailable when the transport cannot read notes', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, { Word: '{expression}' }, { duplicateBehavior: 'overwrite' });
             const { transport } = createFakeAnki();
             transport.notesInfo = undefined;
@@ -366,7 +368,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         });
 
         test('the display controller adds, reports duplicates, and follows duplicate behaviour', async ({ expect }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, { Word: '{expression}', Meaning: '{glossary-brief}' });
             const { transport, notes, browsed } = createFakeAnki();
             const controller = createDisplayController(client, { anki: transport });
@@ -415,7 +417,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
         test('the display controller falls back without error details and browsing (AnkiConnect Android)', async ({
             expect,
         }) => {
-            const client = await importedClient(createStorage);
+            const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, { Word: '{expression}' });
             const { transport } = createFakeAnki({ errorDetail: false, browse: false });
             const controller = createDisplayController(client, { anki: transport });

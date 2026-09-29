@@ -79,6 +79,8 @@ export type ImportOptions = {
     source: ArchiveSource;
     signal?: AbortSignalLike;
     onProgress?: (progress: ImportProgress) => void;
+    /** For transports: awaited before an import settles, so a cancel still in flight is honoured. */
+    beforeFinish?: () => Promise<void>;
 };
 
 export type TermLookupOptions = FindTermsDetails & { mode?: FindTermsMode };
@@ -246,13 +248,13 @@ export async function createYomitan(options: CreateYomitanOptions) {
      */
     const importPrepared = async (
         { reader, title }: PreparedArchive,
-        { signal, onProgress, replace = false }: Omit<ImportOptions, 'source'> & { replace?: boolean },
+        { signal, onProgress, beforeFinish, replace = false }: Omit<ImportOptions, 'source'> & { replace?: boolean },
     ): Promise<InstalledDictionary> => {
         let session: Awaited<ReturnType<typeof storage.sessions.begin>>;
         try {
             throwIfAborted(signal);
             await recoverWriteSessions(storage, storage.sessions);
-            session = await storage.sessions.begin('import', title);
+            session = await storage.sessions.begin(replace ? 'replace' : 'import', title);
         } catch (error) {
             await reader.close?.();
             throw error;
@@ -286,6 +288,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
             } catch (error) {
                 outcome = { result: null, errors: [error instanceof Error ? error : new Error(String(error))] };
             }
+            await beforeFinish?.();
             const { result, errors } = outcome;
             if (errors.length > 0 || result === null || signal?.aborted) {
                 // Atomic import: remove whatever was written (a listed deviation from upstream).
@@ -310,8 +313,13 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return installed;
     };
 
-    const importFrom = async ({ source, signal, onProgress }: ImportOptions): Promise<InstalledDictionary> =>
-        await importPrepared(await prepareArchive(source, signal), { signal, onProgress });
+    const importFrom = async ({
+        source,
+        signal,
+        onProgress,
+        beforeFinish,
+    }: ImportOptions): Promise<InstalledDictionary> =>
+        await importPrepared(await prepareArchive(source, signal), { signal, onProgress, beforeFinish });
 
     const deleteDictionary = async (
         title: string,
@@ -449,7 +457,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
             /** Re-imports a dictionary from its update URL, keeping its profile settings and position. */
             async update(
                 title: string,
-                { signal, onProgress }: Omit<ImportOptions, 'source'> = {},
+                { signal, onProgress, beforeFinish }: Omit<ImportOptions, 'source'> = {},
             ): Promise<InstalledDictionary> {
                 const [update] = await checkUpdates([title]);
                 if (update === undefined) {
@@ -474,7 +482,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 const index = profile.options.dictionaries.findIndex(({ name }) => name === title);
                 const settings = index >= 0 ? clone(profile.options.dictionaries[index]) : null;
                 // Past this point the replacement is committed to: aborting would lose both versions.
-                const result = await importPrepared(prepared, { onProgress, replace: true });
+                const result = await importPrepared(prepared, { onProgress, beforeFinish, replace: true });
                 if (settings !== null) {
                     const current = profile.options.dictionaries.findIndex(({ name }) => name === result.title);
                     if (current >= 0) {
