@@ -133,46 +133,58 @@ export async function recoverWriteSessions(
 
 type YomitanStorageLike = DictionaryStorage & { withWriteGuard(guard: WriteGuard): DictionaryStorage };
 
-/** Sessions for storage that lives in one JavaScript realm; nothing survives a crash to recover. */
+/**
+ * Sessions for storage that lives in one JavaScript realm. Nothing survives the realm, but an
+ * abandoned session stays stale until recovery claims it, as it would in shared storage.
+ */
 export class InProcessWriteSessions implements WriteSessionStore {
     private active: WriteSessionRecord | null = null;
+    private readonly abandoned = new Map<string, WriteSessionRecord>();
 
     async begin(kind: WriteKind, title: string): Promise<WriteSession> {
-        if (this.active !== null) {
+        if (this.active !== null || this.abandoned.size > 0) {
             throw new StorageBusyError();
         }
-        const record: WriteSessionRecord = { id: createSessionId(), kind, title, startedAt: Date.now() };
-        this.active = record;
-        return {
-            record,
-            guard: async () => {
-                if (this.active?.id !== record.id) {
-                    throw new SessionLostError();
-                }
-            },
-            end: async () => {
-                if (this.active?.id === record.id) {
-                    this.active = null;
-                }
-            },
-            abandon: () => {
-                // Nothing survives the realm, so there is nothing to recover later.
-                if (this.active?.id === record.id) {
-                    this.active = null;
-                }
-            },
-        };
+        return this.start({ id: createSessionId(), kind, title, startedAt: Date.now() });
     }
 
     async listStale(): Promise<WriteSessionRecord[]> {
-        return [];
+        return [...this.abandoned.values()];
     }
 
     async listLiveTitles(): Promise<Set<string>> {
         return new Set(this.active === null ? [] : [this.active.title]);
     }
 
-    async claimIfStale(_id: string): Promise<WriteSession | null> {
-        return null;
+    async claimIfStale(id: string): Promise<WriteSession | null> {
+        const record = this.abandoned.get(id);
+        if (record === undefined || this.active !== null) {
+            return null;
+        }
+        this.abandoned.delete(id);
+        return this.start(record);
+    }
+
+    private start(record: WriteSessionRecord): WriteSession {
+        this.active = record;
+        return {
+            record,
+            guard: async () => {
+                if (this.active !== record) {
+                    throw new SessionLostError();
+                }
+            },
+            end: async () => {
+                if (this.active === record) {
+                    this.active = null;
+                }
+            },
+            abandon: () => {
+                if (this.active === record) {
+                    this.active = null;
+                    this.abandoned.set(record.id, record);
+                }
+            },
+        };
     }
 }

@@ -1,5 +1,12 @@
+import { test } from 'vitest';
+import { createYomitan } from '../../core/src/client/yomitan';
+import { createFilesArchiveReader } from '../../core/src/import/archive';
 import { createMemoryStorage } from '../../core/src/storage/memory-storage';
+import { recoverWriteSessions } from '../../core/src/storage/sessions';
+import type { StorageBackend } from '../../core/src/storage/types';
 import {
+    createDictionaryArchive,
+    readFixtureDictionaryFiles,
     runClientContract,
     runGeneratedGoldens,
     runImportContract,
@@ -12,3 +19,53 @@ runTranslatorParity('memory', createMemoryStorage);
 runImportContract('memory', createMemoryStorage);
 runClientContract('memory', createMemoryStorage);
 runGeneratedGoldens('memory', createMemoryStorage);
+
+test('memory: recovery removes a dictionary after replacement deletion fails', async ({ expect }) => {
+    const TITLE = 'Test Dictionary';
+    const archive = await createDictionaryArchive('valid-dictionary1', { level: 6 });
+    const files = readFixtureDictionaryFiles('valid-dictionary1');
+    const updatable = {
+        ...JSON.parse(files['index.json'] as string),
+        isUpdatable: true,
+        indexUrl: 'https://example.test/index.json',
+        downloadUrl: 'https://example.test/d.zip',
+    };
+    files['index.json'] = JSON.stringify(updatable);
+    const storage = createMemoryStorage();
+    const client = await createYomitan({
+        storage,
+        fetch: async (url) => ({
+            ok: true,
+            status: 200,
+            json: async () => (url.endsWith('index.json') ? { ...updatable, revision: 'test2' } : {}),
+            arrayBuffer: async () => archive,
+        }),
+        archiveReaders: { directory: () => createFilesArchiveReader(files) },
+    });
+    const { backend } = storage as unknown as { backend: StorageBackend };
+    const deleteWhere = backend.deleteWhere;
+    try {
+        await client.dictionaries.import({ source: { directory: 'main' } });
+        expect(await backend.count('terms', 'dictionary', TITLE)).toBeGreaterThan(0);
+        const failure = new Error('termMeta deletion failed');
+        let failOnce = true;
+        backend.deleteWhere = async (store, ...args) => {
+            if (store === 'termMeta' && failOnce) {
+                failOnce = false;
+                throw failure;
+            }
+            return deleteWhere.call(backend, store, ...args);
+        };
+
+        await expect(client.dictionaries.update(TITLE)).rejects.toBe(failure);
+        expect(await backend.count('terms', 'dictionary', TITLE)).toBe(0);
+        expect(await storage.getDictionaryInfo()).toMatchObject([{ title: TITLE, importSuccess: true }]);
+        expect(await storage.sessions.listStale()).toMatchObject([{ title: TITLE }]);
+
+        await recoverWriteSessions(storage, storage.sessions);
+        expect(await client.dictionaries.list()).toEqual([]);
+    } finally {
+        backend.deleteWhere = deleteWhere;
+        await client.dispose();
+    }
+});

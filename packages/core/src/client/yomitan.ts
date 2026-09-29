@@ -259,7 +259,14 @@ export async function createYomitan(options: CreateYomitanOptions) {
         let installed: InstalledDictionary;
         try {
             if (replace) {
-                await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
+                try {
+                    await storage.withWriteGuard(session.guard).deleteDictionary(title, 1000, () => {});
+                } catch (deleteError) {
+                    // A half-deleted dictionary is left to recovery, which finishes removing it.
+                    session.abandon();
+                    await reader.close?.();
+                    throw deleteError;
+                }
             } else if (await storage.dictionaryExists(title)) {
                 // Refused before anything is written, so cleanup never touches the installed dictionary.
                 await reader.close?.();
