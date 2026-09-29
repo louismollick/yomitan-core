@@ -254,13 +254,14 @@ export class SqlBackend implements StorageBackend {
     /** Runs `fn` in one write transaction, serialized with every other backend call. */
     transaction<T>(fn: () => Promise<T>): Promise<T> {
         return this.mutex.run(async () => {
-            await this.driver.exec('BEGIN IMMEDIATE');
+            await this.driver.exec('SAVEPOINT yomitan_write');
             try {
                 const result = await fn();
-                await this.driver.exec('COMMIT');
+                await this.driver.exec('RELEASE yomitan_write');
                 return result;
             } catch (error) {
-                await this.driver.exec('ROLLBACK');
+                await this.driver.exec('ROLLBACK TO yomitan_write');
+                await this.driver.exec('RELEASE yomitan_write');
                 throw error;
             }
         });

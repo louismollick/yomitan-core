@@ -9,7 +9,7 @@ export type SqlRunResult = { changes: number; lastInsertRowId: number };
 
 /**
  * The minimal SQLite connection yomitan-core needs. Node wraps better-sqlite3; React Native wraps
- * op-sqlite. SQL storage issues its own `BEGIN`/`COMMIT` through `exec` and never relies on a
+ * op-sqlite. SQL storage issues its own savepoints through `exec` and never relies on a
  * driver's implicit batch transaction, because those differ between drivers.
  *
  * BLOB columns must come back as `Uint8Array` (a Node `Buffer` qualifies).
