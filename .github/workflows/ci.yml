@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install browser test engines
+        run: npx playwright install --with-deps chromium webkit
+
       - name: Install Hermes CLI
         run: npx --yes jsvu@2 --os=linux64 --engines=hermes
 

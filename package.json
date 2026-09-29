@@ -6,6 +6,7 @@
   "workspaces": [
     "packages/core",
     "packages/node",
+    "packages/web",
     "packages/react-native",
     "packages/contract-tests"
   ],
@@ -13,9 +14,10 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
-    "verify": "npm run build && npm run typecheck && npm run lint && npm run test",
+    "verify": "npm run build && npm run typecheck && npm run lint && npm run test && npm run test:e2e",
     "sync-upstream": "npm run sync-upstream -w yomitan-core",
     "prepare": "husky"
   },
@@ -23,9 +25,11 @@
     "@biomejs/biome": "^1.9.4",
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
+    "@playwright/test": "1.61.0",
     "husky": "^9.1.7",
     "tsdown": "^0.15.12",
     "typescript": "^5.7.2",
+    "vite": "^7.3.6",
     "vitest": "^3.2.4"
   },
   "engines": {
