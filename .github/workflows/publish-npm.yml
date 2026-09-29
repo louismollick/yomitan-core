@@ -80,7 +80,7 @@ jobs:
         run: node scripts/release/install-smoke.mjs
 
       - name: Publish prerelease
-        run: node scripts/release/publish.mjs --tag "${{ steps.prerelease.outputs.dist_tag }}"
+        run: node scripts/release/publish.mjs --tag "${{ steps.prerelease.outputs.dist_tag }}" --allow-missing
 
   publish-release-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.release-candidate && github.ref_name != 'main' && github.ref_name != 'master'
@@ -119,7 +119,7 @@ jobs:
         run: node scripts/release/install-smoke.mjs
 
       - name: Publish release candidate
-        run: node scripts/release/publish.mjs --tag rc
+        run: node scripts/release/publish.mjs --tag rc --allow-missing
 
   publish:
     if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')

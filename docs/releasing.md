@@ -24,7 +24,9 @@ npm trusted publishing (OIDC, no token) only works for a package that already ex
 1. Publish it once by hand as a prerelease, for example `npm publish -w @yomitan-core/web --tag next` after `node scripts/release/set-version.mjs 2.0.0-next.0`. This needs your npm account, which must own the `@yomitan-core` scope.
 2. On npmjs.com, add the trusted publisher: GitHub repository `louismollick/yomitan-core`, workflow `publish-npm.yml`.
 
-Until then, CI publishes the packages that exist and skips the others with a warning.
+Until then, prereleases and release candidates publish the packages that exist and skip the others with a warning. A release to `latest` refuses to start unless all four packages exist.
+
+Publishing is idempotent: a version that's already on npm is skipped. So a release that failed partway can be re-run.
 
 ## Shipping 2.0.0
 

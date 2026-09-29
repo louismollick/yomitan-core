@@ -15,6 +15,7 @@
     [
       "@semantic-release/exec",
       {
+        "verifyConditionsCmd": "node scripts/release/publish.mjs --check",
         "prepareCmd": "node scripts/release/set-version.mjs ${nextRelease.version} && npm install --package-lock-only --ignore-scripts && npm run build && node scripts/release/install-smoke.mjs",
         "publishCmd": "node scripts/release/publish.mjs --tag latest"
       }
