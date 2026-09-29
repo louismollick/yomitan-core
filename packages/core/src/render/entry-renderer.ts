@@ -7,14 +7,7 @@
  * strings (Node, WebViews, React Native previews).
  */
 
-import {
-    NODE_TYPES,
-    StringDOMParser,
-    StringDocument,
-    StringDocumentFragment,
-    type StringElement,
-    createStringWindow,
-} from '../dom/string-dom';
+import { NODE_TYPES, StringDOMParser, StringDocument, StringDocumentFragment, createStringWindow } from '../dom/string-dom';
 import { type UpstreamEnv, withUpstreamEnv } from '../platform/upstream-env';
 import type { Summary } from '../storage/types';
 import { fetchText } from '../upstream/ext/js/core/fetch-utilities.js';
@@ -77,6 +70,7 @@ class RendererContentManager {
 
 type Generator = {
     _templates: { load(source: unknown): void };
+    instantiateTemplate(name: string): unknown;
     updateLanguage(language: string): void;
     createTermEntry(entry: TermDictionaryEntry, dictionaryInfo: Summary[]): unknown;
     createKanjiEntry(entry: KanjiDictionaryEntry, dictionaryInfo: Summary[]): unknown;
@@ -118,21 +112,61 @@ export class EntryRenderer<TElement = unknown> {
         return withUpstreamEnv(this.env, () => this.generator.createKanjiEntry(entry, dictionaryInfo)) as TElement;
     }
 
+    /** An element from Yomitan's display templates (e.g. `action-button-container`). */
+    instantiateTemplate(name: string): TElement {
+        return withUpstreamEnv(this.env, () => this.generator.instantiateTemplate(name)) as TElement;
+    }
+
     render(entry: TermDictionaryEntry | KanjiDictionaryEntry, dictionaryInfo: Summary[]): TElement {
         return entry.type === 'kanji' ? this.renderKanji(entry, dictionaryInfo) : this.renderTerm(entry, dictionaryInfo);
     }
 }
 
-/** Every `img.gloss-image` with the dictionary and path of the image it shows. */
-export function findGlossImages(root: StringElement): { image: StringElement; dictionary: string; path: string }[] {
-    const results: { image: StringElement; dictionary: string; path: string }[] = [];
-    for (const link of root.querySelectorAll('a.gloss-image-link')) {
-        const image = link.querySelector('.gloss-image');
+type ElementLike = {
+    querySelectorAll(selector: string): ArrayLike<ElementLike> & Iterable<ElementLike>;
+    querySelector(selector: string): ElementLike | null;
+    getAttribute(name: string): string | null;
+    setAttribute(name: string, value: string): void;
+    removeAttribute(name: string): void;
+    style: { setProperty(name: string, value: string): void; removeProperty(name: string): string };
+};
+
+export type GlossImage<T extends ElementLike = ElementLike> = { link: T; image: T; background: T | null; dictionary: string; path: string };
+
+/** Every dictionary image (`a.gloss-image-link` with its `img.gloss-image`) in rendered entries. */
+export function findGlossImages<T extends ElementLike>(root: T): GlossImage<T>[] {
+    const results: GlossImage<T>[] = [];
+    for (const link of root.querySelectorAll('a.gloss-image-link') as Iterable<T>) {
+        const image = link.querySelector('.gloss-image') as T | null;
         const dictionary = link.getAttribute('data-dictionary');
         const path = link.getAttribute('data-path');
         if (image !== null && dictionary !== null && path !== null) {
-            results.push({ image, dictionary, path });
+            results.push({ link, image, background: link.querySelector('.gloss-image-background') as T | null, dictionary, path });
         }
     }
     return results;
+}
+
+/**
+ * Upstream `StructuredContentGenerator._setImageData`: shows an image (or marks it failed). The
+ * `--image` variable drives monochrome images. `linkToImage: false` keeps large data URIs out of `href`.
+ */
+export function setGlossImageSource(
+    { link, image, background }: GlossImage,
+    url: string | null,
+    { linkToImage = true }: { linkToImage?: boolean } = {},
+): void {
+    if (url !== null) {
+        image.setAttribute('src', url);
+        if (linkToImage) {
+            link.setAttribute('href', url);
+        }
+        link.setAttribute('data-image-load-state', 'loaded');
+        background?.style.setProperty('--image', `url("${url}")`);
+    } else {
+        image.removeAttribute('src');
+        link.removeAttribute('href');
+        link.setAttribute('data-image-load-state', 'load-error');
+        background?.style.removeProperty('--image');
+    }
 }

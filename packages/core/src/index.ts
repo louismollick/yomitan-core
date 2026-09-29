@@ -94,6 +94,14 @@ export {
     type SaveAction,
 } from './display/display-controller';
 export { type ThemeContext, addScopeToCss, getCustomCss, getDisplayAttributes, getFontStyle } from './render/display-options';
-export { type DomEnvironment, EntryRenderer, type LinkHandler, createStringDomEnvironment } from './render/entry-renderer';
+export {
+    type DomEnvironment,
+    EntryRenderer,
+    findGlossImages,
+    type GlossImage,
+    type LinkHandler,
+    createStringDomEnvironment,
+    setGlossImageSource,
+} from './render/entry-renderer';
 export { type HtmlMediaMode, getPopupCss } from './render/html';
 export { upstreamEnv, withUpstreamEnv } from './platform/upstream-env';

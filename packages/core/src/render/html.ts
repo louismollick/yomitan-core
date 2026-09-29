@@ -9,7 +9,7 @@ import type { StringElement } from '../dom/string-dom';
 import type { ProfileOptions } from '../profile/profile';
 import { fetchText } from '../upstream/ext/js/core/fetch-utilities.js';
 import { type ThemeContext, getCustomCss, getDisplayAttributeEntries, getFontStyle } from './display-options';
-import { findGlossImages } from './entry-renderer';
+import { findGlossImages, setGlossImageSource } from './entry-renderer';
 
 /** The stylesheets Yomitan's popup page loads, in its order. */
 const POPUP_STYLESHEETS = ['/css/material.css', '/css/display.css', '/css/display-pronunciation.css', '/css/structured-content.css'];
@@ -52,20 +52,19 @@ export async function resolveImages(root: StringElement, mode: HtmlMediaMode, lo
     if (mode === 'placeholder') {
         return;
     }
-    for (const { image, dictionary, path } of findGlossImages(root)) {
+    for (const glossImage of findGlossImages(root)) {
+        const { dictionary, path } = glossImage;
         if (typeof mode === 'object') {
-            image.setAttribute(
-                'src',
-                mode.urlTemplate
-                    .replace(/\{dictionary\}/g, encodeURIComponent(dictionary))
-                    .replace(/\{path\}/g, encodeURIComponent(path)),
-            );
+            const url = mode.urlTemplate
+                .replace(/\{dictionary\}/g, encodeURIComponent(dictionary))
+                .replace(/\{path\}/g, encodeURIComponent(path));
+            setGlossImageSource(glossImage, url);
             continue;
         }
         const media = await loadMedia(dictionary, path);
-        if (media !== null) {
-            image.setAttribute('src', `data:${media.mediaType};base64,${encodeBase64(media.content)}`);
-        }
+        setGlossImageSource(glossImage, media === null ? null : `data:${media.mediaType};base64,${encodeBase64(media.content)}`, {
+            linkToImage: false,
+        });
     }
 }
 
