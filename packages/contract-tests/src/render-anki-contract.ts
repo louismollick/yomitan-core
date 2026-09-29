@@ -290,7 +290,12 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
                 {
                     type: 'structured-content',
                     content: [
-                        { tag: 'span', data: { 'x onmouseover': 'alert(1)', ok: 'yes' }, content: 'data' },
+                        {
+                            tag: 'span',
+                            data: { 'x onmouseover': 'alert(1)', 'x<svg': '1', ok: 'yes' },
+                            content: 'data',
+                        },
+                        { tag: 'span', style: { background: 'url(https://example.com/bg#abc)' }, content: 'url' },
                         { tag: 'span', style: { color: 'red; position: fixed; inset: 0' }, content: 'style' },
                     ],
                 },
@@ -319,6 +324,8 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             const html = await client.render.html((await client.lookup.terms('悪')).entries);
             expect(html).toContain('data-sc-ok="yes"');
             expect(html).not.toContain('onmouseover');
+            expect(html).not.toContain('x<svg');
+            expect(html).toContain('url(https://example.com/bg#abc)');
             expect(html).not.toContain('position: fixed');
             await client.dispose();
         });

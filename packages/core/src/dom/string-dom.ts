@@ -325,8 +325,14 @@ function normalizeColorToken(token: string): string {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
+/** Hex colors become `rgb()` as browsers serialize them; `url(...)` and strings are left alone. */
 function normalizeStyleValue(value: string): string {
-    return value.trim().replace(/#[0-9a-f]{3,8}\b/gi, normalizeColorToken);
+    return value
+        .trim()
+        .replace(
+            /url\((?:[^()"']|"[^"]*"|'[^']*')*\)|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(#[0-9a-f]{3,8}\b)/gi,
+            (match, hex) => (hex === undefined ? match : normalizeColorToken(match)),
+        );
 }
 
 /** Enough of CSSStyleDeclaration for the vendored generators; it keeps the `style` attribute in sync. */
@@ -431,8 +437,9 @@ function createStyleProxy(style: StringStyle): StringStyle & Record<string, stri
     }) as StringStyle & Record<string, string>;
 }
 
-/** Browsers reject attribute names with whitespace, NUL, `/`, `>`, `=` or quotes. */
-const VALID_ATTRIBUTE_NAME = /^[^\s\0"'>/=]+$/;
+/** The XML `Name` production browsers check in `setAttribute` (and so for dataset keys). */
+const VALID_ATTRIBUTE_NAME =
+    /^[:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][-.0-9:A-Z_a-z\u00B7\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u037D\u037F-\u1FFF\u200C\u200D\u203F\u2040\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]*$/;
 
 /** The DOMException browsers throw, for upstream code that catches it. */
 export class DomError extends Error {
