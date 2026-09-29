@@ -94,5 +94,11 @@
       "replace": "export type DatabaseUpdateItem<T extends ObjectStoreName = ObjectStoreName> = {\n    primaryKey: number;\n    data: ObjectStoreData<T>;\n};",
       "reason": "Unbound type parameter (TS2304); IDBValidKey needs the DOM lib, and every store uses numeric keys."
     }
+  ],
+  "css": [
+    "ext/css/material.css",
+    "ext/css/display.css",
+    "ext/css/display-pronunciation.css",
+    "ext/css/structured-content.css"
   ]
 }

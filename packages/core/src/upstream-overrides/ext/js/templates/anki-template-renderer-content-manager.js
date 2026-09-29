@@ -1,4 +1,3 @@
-// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
 /*
  * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2022  Yomichan Authors

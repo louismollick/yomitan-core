@@ -71,3 +71,43 @@ export type { ParseHeadword, ParseSegment, ParseToken, ScanResult, TextRange } f
 export type { Sentence } from './lookup/text-source';
 export type { DictionaryOptions, Profile, ProfileOptions } from './profile/profile';
 export type { KanjiDictionaryEntry, TermDictionaryEntry } from './upstream/types/ext/dictionary';
+export {
+    type AnkiConnectOptions,
+    type AnkiNote,
+    type AnkiNoteContext,
+    type AnkiNoteInfo,
+    type AnkiTransport,
+    type BuildNoteOptions,
+    type BuiltNote,
+    createAnkiConnectTransport,
+    type FieldOverwriteMode,
+    type NoteState,
+} from './anki/anki';
+export {
+    type AddNoteResult,
+    type CardFormatState,
+    createDisplayController,
+    type DisplayController,
+    type DisplayControllerClient,
+    DuplicateNoteError,
+    type EntryNoteStates,
+    type SaveAction,
+} from './display/display-controller';
+export {
+    type ThemeContext,
+    addScopeToCss,
+    getCustomCss,
+    getDisplayAttributes,
+    getFontStyle,
+} from './render/display-options';
+export {
+    type DomEnvironment,
+    EntryRenderer,
+    findGlossImages,
+    type GlossImage,
+    type LinkHandler,
+    createStringDomEnvironment,
+    setGlossImageSource,
+} from './render/entry-renderer';
+export { type HtmlMediaMode, getPopupCss } from './render/html';
+export { upstreamEnv, withUpstreamEnv } from './platform/upstream-env';

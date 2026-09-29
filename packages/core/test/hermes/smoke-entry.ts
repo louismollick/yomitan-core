@@ -76,12 +76,29 @@ async function main(): Promise<void> {
     const scan = await client.lookup.scan('今日は打ち込む。明日も', 3);
     const parse = await client.lookup.parse('打ち込む\n打つ');
     const recommended = await client.dictionaries.recommended('ja');
+    const html = await client.render.html((await client.lookup.terms('画像')).entries, { media: 'data-uri' });
+    const profile = client.profile.get();
+    profile.options.anki.cardFormats[0].fields = {
+        Word: { value: '{expression}', overwriteMode: 'coalesce' },
+        Glossary: { value: '{glossary}', overwriteMode: 'coalesce' },
+        Pitch: { value: '{pitch-accent-graphs}', overwriteMode: 'coalesce' },
+    } as never;
+    await client.profile.set(profile);
+    const { note, errors: noteErrors } = await client.anki.buildNote(
+        (await client.lookup.terms('打ち込む')).entries[0],
+    );
     print(
         `__SMOKE_CLIENT__${JSON.stringify({
             range: scan?.range,
             sentence: scan?.sentence,
             parse: parse.map((token) => token.text),
             recommended: recommended.length > 0,
+            html: html.includes('class="entry"') && html.includes('src="data:image/gif;base64,'),
+            note: {
+                word: note.fields.Word,
+                glossary: note.fields.Glossary.startsWith('<div'),
+                errors: noteErrors.length,
+            },
         })}`,
     );
     await client.dispose();

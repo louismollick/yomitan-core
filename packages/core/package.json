@@ -37,6 +37,7 @@
     "@babel/runtime": "^7.29.7",
     "@react-native/babel-preset": "^0.86.0",
     "@types/babel__core": "^7.20.5",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^22.20.4",
     "@zip.js/zip.js": "^2.7.54",
     "acorn": "^8.18.0",
@@ -50,6 +51,7 @@
     "hermes-compiler": "^250829098.0.14",
     "jsdom": "^25.0.1",
     "kanji-processor": "^1.0.2",
+    "linkedom": "^0.18.10",
     "parse5": "^7.2.1",
     "yomitan-handlebars": "git+https://github.com/yomidevs/yomitan-handlebars.git#12aff5e3550954d7d3a98a5917ff7d579f3cce25"
   }

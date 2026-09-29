@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
     runClientContract,
     runImportContract,
+    runRenderAnkiContract,
     runStorageContract,
     runTranslatorParity,
     upstreamFixturesDir,
@@ -21,3 +22,4 @@ runImportContract('sqlite', createFileStorage, {
     directory: () => createDirectoryArchiveReader(join(upstreamFixturesDir, 'dictionaries', 'valid-dictionary1')),
 });
 runClientContract('sqlite', createFileStorage);
+runRenderAnkiContract('sqlite', createFileStorage);

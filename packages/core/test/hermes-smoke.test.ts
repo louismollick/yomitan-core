@@ -133,6 +133,8 @@ describe('Hermes smoke test', () => {
                 sentence: { text: '今日は打ち込む。', offset: 3 },
                 parse: ['打ち込む', '\n', '打つ'],
                 recommended: true,
+                html: true,
+                note: { word: '打ち込む', glossary: true, errors: 0 },
             });
             const marker = '__SMOKE_RESULT__';
             const results = JSON.parse(output.slice(output.indexOf(marker) + marker.length).split('\n')[0]);
