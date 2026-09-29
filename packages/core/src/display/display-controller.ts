@@ -18,6 +18,7 @@ import {
     getOverwrittenField,
 } from '../anki/anki';
 import type { ProfileOptions } from '../profile/profile';
+import { isNoteDataValid } from '../upstream/ext/js/data/anki-util.js';
 import type { DictionaryEntry } from '../upstream/types/ext/dictionary';
 
 export type SaveAction = 'add' | 'add-duplicate' | 'overwrite' | 'disabled';
@@ -28,7 +29,7 @@ export type CardFormatState = {
     icon: string;
     /** What the save button does now, following the profile's `anki.duplicateBehavior`. */
     action: SaveAction;
-    /** Why the button is disabled, when it is. */
+    /** Why the button is disabled, or a warning (such as Anki being unreachable) when it isn't. */
     reason: string | null;
     state: NoteState;
     /** Existing notes the "view note" button opens. Empty when there are none or the transport can't browse. */
@@ -128,25 +129,39 @@ export function createDisplayController(client: DisplayControllerClient, { anki 
             const flat = built.flat();
             const fetchInfo =
                 options.anki.duplicateBehavior === 'overwrite' || options.anki.displayTagsAndFlags !== 'never';
-            const states =
-                flat.length === 0
-                    ? []
-                    : await getNoteStates(
-                          anki,
-                          flat.map(({ note }) => note),
-                          fetchInfo,
-                      );
+            // Anki being unreachable doesn't stop an add (the click tries again): the buttons stay
+            // available with the reason, where Yomitan would disable them (listed deviation).
+            let unreachable: string | null = null;
+            let states: NoteState[];
+            try {
+                states =
+                    flat.length === 0
+                        ? []
+                        : await getNoteStates(
+                              anki,
+                              flat.map(({ note }) => note),
+                              fetchInfo,
+                          );
+            } catch (error) {
+                unreachable = `Could not check Anki for duplicates (${error instanceof Error ? error.message : String(error)})`;
+                states = flat.map(({ note }) => {
+                    const valid = isNoteDataValid(note) as boolean;
+                    return { canAdd: valid, valid, duplicateNoteIds: [], noteInfos: [] };
+                });
+            }
             let offset = 0;
             return built.map((notes, entryIndex) => ({
                 entryIndex,
                 cardFormats: notes.map(({ cardFormatIndex, errors }) => {
                     const state = states[offset++];
                     const format = options.anki.cardFormats[cardFormatIndex];
-                    const { action, reason } = getSaveAction(
+                    const saveAction = getSaveAction(
                         options.anki.duplicateBehavior,
                         state,
                         anki.notesInfo !== undefined,
                     );
+                    const { action } = saveAction;
+                    const reason = action === 'add' && unreachable !== null ? unreachable : saveAction.reason;
                     return {
                         cardFormatIndex,
                         name: format.name,

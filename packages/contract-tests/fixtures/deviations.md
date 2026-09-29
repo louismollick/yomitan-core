@@ -17,3 +17,4 @@ Intentional differences from upstream behaviour at the pinned commit. An unliste
 | Translator fixtures phrased as options | n/a | Run at the internal translator seam; the public path is covered by profile-mapping goldens | Plan §4 |
 | Dictionary CSS in the popup | Parsed by the CSSOM, then nested under `[data-dictionary]` | Reduced to balanced rules first (same splitter), so a stray `}` can't leave the scope | No CSSOM outside browsers; the string output must be safe on its own |
 | `<` in dictionary CSS | Kept | Written as the CSS escape `\3c ` in popup and Anki `<style>` output | Keeps `</style>` from ending the style element |
+| Anki unreachable while showing entries | Save buttons disabled with an error | Buttons stay on `add`, with the reason as a warning; the click tries Anki again | Consumers (mokuro-reader) kept adding possible when the duplicate check failed |
