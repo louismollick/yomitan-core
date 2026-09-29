@@ -16,19 +16,24 @@ export function createOpSqliteDouble(): OpenDatabase {
             if (closed) {
                 throw new Error('Database is closed');
             }
-            if (/^\s*BEGIN\b/i.test(sql) && database.inTransaction) {
-                throw new Error('JS-thread BEGIN while another transaction is open');
-            }
             const statement = database.prepare(sql);
             const values = params.map(binding);
             if (statement.reader) {
-                return { rows: statement.all(...values) as Record<string, unknown>[], rowsAffected: 0 };
+                const rows = (statement.all(...values) as Record<string, unknown>[]).map((row) =>
+                    Object.fromEntries(
+                        Object.entries(row).map(([key, value]) => [
+                            key,
+                            value instanceof Uint8Array ? new Uint8Array(value).buffer : value,
+                        ]),
+                    ),
+                );
+                return { rows, rowsAffected: 0 };
             }
             const result = statement.run(...values);
             return { rows: [], rowsAffected: result.changes, insertId: Number(result.lastInsertRowid) };
         };
         const connection: OpSqliteConnection & {
-            executeSync: typeof executeSync;
+            executeSync(): never;
             executeBatch(): never;
         } = {
             execute(sql, params) {
@@ -39,7 +44,9 @@ export function createOpSqliteDouble(): OpenDatabase {
                 );
                 return task;
             },
-            executeSync,
+            executeSync() {
+                throw new Error('executeSync is forbidden in the op-sqlite driver');
+            },
             executeBatch() {
                 throw new Error('executeBatch is forbidden in the op-sqlite driver');
             },

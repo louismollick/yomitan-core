@@ -27,8 +27,50 @@ export type OpenDatabase = (options: { name: string; location?: string; readOnly
     | OpSqliteConnection
     | Promise<OpSqliteConnection>;
 
+/** Split statement boundaries without treating quoted text, identifiers or comments as SQL. */
+function splitStatements(sql: string): string[] {
+    const statements: string[] = [];
+    let start = 0;
+    let quote = '';
+    let comment = '';
+    let hasSql = false;
+    for (let i = 0; i < sql.length; i++) {
+        const char = sql[i];
+        const next = sql[i + 1];
+        if (comment === '--') {
+            if (char === '\n' || char === '\r') comment = '';
+        } else if (comment === '/*') {
+            if (char === '*' && next === '/') {
+                comment = '';
+                i++;
+            }
+        } else if (quote) {
+            if (char === quote) {
+                if (next === quote && quote !== ']') i++;
+                else quote = '';
+            }
+        } else if ((char === '-' && next === '-') || (char === '/' && next === '*')) {
+            comment = char + next;
+            i++;
+        } else if (char === ';') {
+            if (hasSql) statements.push(sql.slice(start, i));
+            start = i + 1;
+            hasSql = false;
+        } else if (!/\s/.test(char)) {
+            hasSql = true;
+            if (char === "'" || char === '"' || char === '`') quote = char;
+            else if (char === '[') quote = ']';
+        }
+    }
+    if (hasSql) statements.push(sql.slice(start));
+    return statements;
+}
+
 /** One connection for one file. All statements, including transaction control, use the async queue. */
-export function createOpSqliteDriver(openDatabase: () => OpSqliteConnection | Promise<OpSqliteConnection>): SqlDriver {
+export function createOpSqliteDriver(
+    openDatabase: () => OpSqliteConnection | Promise<OpSqliteConnection>,
+    options: { readOnly?: boolean } = {},
+): SqlDriver {
     let database: OpSqliteConnection | null = null;
     const connection = (): OpSqliteConnection => {
         if (database === null) {
@@ -37,15 +79,28 @@ export function createOpSqliteDriver(openDatabase: () => OpSqliteConnection | Pr
         return database;
     };
     return {
+        writeTransaction: 'savepoint',
         async open() {
-            database ??= await openDatabase();
+            if (database !== null) {
+                return;
+            }
+            try {
+                database = await openDatabase();
+                await database.execute('PRAGMA busy_timeout = 5000');
+                if (!options.readOnly) {
+                    await database.execute('PRAGMA journal_mode = WAL');
+                }
+            } catch (error) {
+                const current = database;
+                database = null;
+                await current?.closeAsync().catch(() => {});
+                throw error;
+            }
         },
         async exec(sql) {
             // The schema contains several statements; execute accepts one statement per call.
-            for (const statement of sql.split(';')) {
-                if (statement.trim()) {
-                    await connection().execute(statement);
-                }
+            for (const statement of splitStatements(sql)) {
+                await connection().execute(statement);
             }
         },
         async run(sql, params = []) {
@@ -53,7 +108,15 @@ export function createOpSqliteDriver(openDatabase: () => OpSqliteConnection | Pr
             return { changes: result.rowsAffected, lastInsertRowId: result.insertId ?? 0 };
         },
         async all<T>(sql: string, params: SqlValue[] = []) {
-            return (await connection().execute(sql, params)).rows as T[];
+            const { rows } = await connection().execute(sql, params);
+            return rows.map((row) =>
+                Object.fromEntries(
+                    Object.entries(row).map(([key, value]) => [
+                        key,
+                        value instanceof ArrayBuffer ? new Uint8Array(value) : value,
+                    ]),
+                ),
+            ) as T[];
         },
         async runMany(sql, paramsList) {
             for (const params of paramsList) {
@@ -81,34 +144,40 @@ const openFiles = new Set<string>();
 export function createReactNativeStorage(name: string, options: ReactNativeStorageOptions = {}) {
     const { location, readOnly, openDatabase, ...storageOptions } = options;
     const key = location === ':memory:' ? null : JSON.stringify([location ?? '', name]);
-    const driver = createOpSqliteDriver(async () => {
-        if (key !== null) {
-            if (openFiles.has(key)) {
-                throw new Error(`A connection to ${name} is already open`);
-            }
-            openFiles.add(key);
-        }
-        try {
-            const database =
-                openDatabase === undefined
-                    ? (await import('@op-engineering/op-sqlite')).open({ name, location, readOnly })
-                    : await openDatabase({ name, location, readOnly });
-            return {
-                execute: (sql: string, params?: SqlValue[]) => database.execute(sql, params),
-                async closeAsync() {
-                    await database.closeAsync();
-                    if (key !== null) {
-                        openFiles.delete(key);
-                    }
-                },
-            };
-        } catch (error) {
+    const driver = createOpSqliteDriver(
+        async () => {
             if (key !== null) {
-                openFiles.delete(key);
+                if (openFiles.has(key)) {
+                    throw new Error(`A connection to ${name} is already open`);
+                }
+                openFiles.add(key);
             }
-            throw error;
-        }
-    });
+            try {
+                const database =
+                    openDatabase === undefined
+                        ? (await import('@op-engineering/op-sqlite')).open({ name, location, readOnly })
+                        : await openDatabase({ name, location, readOnly });
+                return {
+                    execute: (sql: string, params?: SqlValue[]) => database.execute(sql, params),
+                    async closeAsync() {
+                        try {
+                            await database.closeAsync();
+                        } finally {
+                            if (key !== null) {
+                                openFiles.delete(key);
+                            }
+                        }
+                    },
+                };
+            } catch (error) {
+                if (key !== null) {
+                    openFiles.delete(key);
+                }
+                throw error;
+            }
+        },
+        { readOnly },
+    );
     return createSqlStorage(driver, storageOptions);
 }
 
@@ -124,6 +193,16 @@ export function createDirectoryArchiveReader(directory: string, fileSystem: Dire
     return {
         async entries() {
             const names = (await fileSystem.list(directory)).sort();
+            for (const name of names) {
+                if (
+                    name.startsWith('/') ||
+                    /^[a-z]:/i.test(name) ||
+                    name.includes('\\') ||
+                    name.split('/').includes('..')
+                ) {
+                    throw new Error(`Unsafe archive entry name: ${name}`);
+                }
+            }
             return names.map((name) => {
                 const path = `${directory.replace(/\/$/, '')}/${name}`;
                 return {

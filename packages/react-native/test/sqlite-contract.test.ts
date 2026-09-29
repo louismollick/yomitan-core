@@ -51,18 +51,6 @@ runTranslatorParity('op-sqlite double', createFileStorage);
 runGeneratedGoldens('op-sqlite double', createFileStorage);
 
 describe('op-sqlite adapter', () => {
-    test('double rejects a JS-thread BEGIN during a transaction and any executeBatch', async () => {
-        const connection = (await openDatabase({ name: 'ignored', location: ':memory:' })) as Awaited<
-            ReturnType<typeof openDatabase>
-        > & { executeSync(sql: string): unknown; executeBatch(): never };
-        await connection.execute('SAVEPOINT active');
-        expect(() => connection.executeSync('BEGIN')).toThrow('JS-thread BEGIN');
-        expect(() => connection.executeBatch()).toThrow('executeBatch is forbidden');
-        await connection.execute('ROLLBACK TO active');
-        await connection.execute('RELEASE active');
-        await connection.closeAsync();
-    });
-
     test('never calls executeBatch or executeSync', async () => {
         const storage = createFileStorage();
         await storage.prepare();
