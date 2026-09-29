@@ -30,8 +30,17 @@ jobs:
       - name: Install browser test engines
         run: npx playwright install --with-deps chromium webkit
 
+      - name: Cache Hermes CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.jsvu
+          key: jsvu-hermes-0.13.0-linux64
+
+      # Pinned, so jsvu downloads the release directly instead of asking the (rate-limited) GitHub API.
       - name: Install Hermes CLI
-        run: npx --yes jsvu@2 --os=linux64 --engines=hermes
+        run: |
+          test -x ~/.jsvu/bin/hermes-0.13.0 || npx --yes jsvu@2 --os=linux64 hermes@0.13.0
+          test -x ~/.jsvu/bin/hermes-0.13.0
 
       - name: Check vendored upstream is in sync
         run: |
@@ -46,7 +55,7 @@ jobs:
       - name: Verify
         env:
           REQUIRE_HERMES: '1'
-          HERMES_BIN: /home/runner/.jsvu/bin/hermes
+          HERMES_BIN: /home/runner/.jsvu/bin/hermes-0.13.0
         run: npm run verify
 
       - name: React Native adapter contracts
