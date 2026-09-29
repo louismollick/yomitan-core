@@ -131,12 +131,6 @@ type NoteBuilder = {
     getDictionaryStylesMap(dictionaries: ProfileOptions['dictionaries']): Map<string, string>;
 };
 
-/** Private-use stand-ins for braces in app marker values while field templates render. */
-const OPEN_BRACE = '\uf8f0';
-const CLOSE_BRACE = '\uf8f1';
-const OPEN_BRACE_PATTERN = /\uf8f0/g;
-const CLOSE_BRACE_PATTERN = /\uf8f1/g;
-
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -201,7 +195,13 @@ export class AnkiNotes {
         if (baseFormat === undefined) {
             throw new RangeError(`The profile has no card format ${cardFormatIndex}`);
         }
-        const cardFormat = this.applyExtraMarkers(baseFormat, entry.type, options, dictionaryInfo, extraMarkers);
+        const { cardFormat, restoreBraces, markers } = this.applyExtraMarkers(
+            baseFormat,
+            entry.type,
+            options,
+            dictionaryInfo,
+            extraMarkers,
+        );
         const source = this.getSource(entry);
         const builder = await this.getBuilder();
         // Upstream sanitizes dictionary CSS with the browser's CSSOM before it reaches Anki fields.
@@ -228,7 +228,7 @@ export class AnkiNotes {
                 fullQuery: context.fullQuery ?? context.query ?? source,
             },
             template: await this.getTemplates(options, dictionaryInfo),
-            tags: this.substitute(options.anki.tags, extraMarkers),
+            tags: this.substitute(options.anki.tags, markers),
             duplicateScope: options.anki.duplicateScope,
             duplicateScopeCheckAllModels: options.anki.duplicateScopeCheckAllModels,
             resultOutputMode: options.general.resultOutputMode,
@@ -239,7 +239,7 @@ export class AnkiNotes {
             dictionaryStylesMap,
         });
         for (const [name, value] of Object.entries(note.fields)) {
-            note.fields[name] = value.replace(OPEN_BRACE_PATTERN, '{').replace(CLOSE_BRACE_PATTERN, '}');
+            note.fields[name] = restoreBraces(value);
         }
         return { note, errors };
     }
@@ -251,14 +251,14 @@ export class AnkiNotes {
         return entry.headwords[0]?.sources[0]?.originalText ?? '';
     }
 
+    /** Replaces every `{name}` in one pass, so a value is never itself read as a marker. */
     private substitute<T extends string | string[]>(value: T, extraMarkers: Record<string, string>): T {
-        const replace = (text: string) => {
-            let result = text;
-            for (const [name, markerValue] of Object.entries(extraMarkers)) {
-                result = result.replace(new RegExp(`\\{${escapeRegExp(name)}\\}`, 'g'), () => markerValue);
-            }
-            return result;
-        };
+        const names = Object.keys(extraMarkers);
+        if (names.length === 0) {
+            return value;
+        }
+        const pattern = new RegExp(`\\{(${names.map(escapeRegExp).join('|')})\\}`, 'g');
+        const replace = (text: string) => text.replace(pattern, (_match, name: string) => extraMarkers[name]);
         return (Array.isArray(value) ? value.map(replace) : replace(value)) as T;
     }
 
@@ -268,25 +268,33 @@ export class AnkiNotes {
         options: ProfileOptions,
         dictionaryInfo: Summary[],
         extraMarkers: Record<string, string>,
-    ): ProfileOptions['anki']['cardFormats'][number] {
+    ): {
+        cardFormat: ProfileOptions['anki']['cardFormats'][number];
+        restoreBraces(text: string): string;
+        markers: Record<string, string>;
+    } {
         const reserved = new Set(this.getMarkers(type, options, dictionaryInfo));
         const markers = Object.fromEntries(Object.entries(extraMarkers).filter(([name]) => !reserved.has(name)));
         if (Object.keys(markers).length === 0) {
-            return cardFormat;
+            return { cardFormat, restoreBraces: (text) => text, markers };
         }
-        // Field values are marker templates: braces in app values are hidden from the marker parser and
-        // restored after the note is built, so a value like `{glossary}` stays literal text.
+        // Field values are marker templates: braces in app values are swapped for tokens unique to this
+        // call and restored after the note is built, so a value like `{glossary}` stays literal text.
+        const nonce = Math.random().toString(36).slice(2);
+        const open = `yomitan-open-brace-${nonce}`;
+        const close = `yomitan-close-brace-${nonce}`;
         const protectedMarkers = Object.fromEntries(
-            Object.entries(markers).map(([name, value]) => [
-                name,
-                value.replace(/\{/g, OPEN_BRACE).replace(/\}/g, CLOSE_BRACE),
-            ]),
+            Object.entries(markers).map(([name, value]) => [name, value.replace(/\{/g, open).replace(/\}/g, close)]),
         );
         const fields: typeof cardFormat.fields = {};
         for (const [name, field] of Object.entries(cardFormat.fields)) {
             fields[name] = { ...field, value: this.substitute(field.value, protectedMarkers) };
         }
-        return { ...cardFormat, deck: this.substitute(cardFormat.deck, markers), fields };
+        return {
+            cardFormat: { ...cardFormat, deck: this.substitute(cardFormat.deck, markers), fields },
+            restoreBraces: (text) => text.split(open).join('{').split(close).join('}'),
+            markers,
+        };
     }
 }
 

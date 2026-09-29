@@ -185,6 +185,9 @@ export function createDisplayController(client: DisplayControllerClient, { anki 
                     throw new DuplicateNoteError();
                 }
                 if (behavior === 'overwrite') {
+                    if (anki.notesInfo === undefined) {
+                        throw new Error('This Anki connection cannot read notes to overwrite them');
+                    }
                     const overwriteId = state.duplicateNoteIds.find((id) => id !== -1);
                     const info = state.noteInfos.find((item) => item !== null && item.noteId === overwriteId);
                     if (overwriteId === undefined || info === undefined || info === null) {

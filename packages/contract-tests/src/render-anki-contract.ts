@@ -259,11 +259,67 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             const client = await importedClient(createStorage);
             await withTermCardFormat(client, { Source: '{series}' });
             const { entries } = await client.lookup.terms('打ち込む');
-            const series = 'ACME $& $$ {expression} {{glossary}}';
-            const { note } = await client.anki.buildNote(entries[0], { extraMarkers: { series } });
+            const series = 'ACME $& $$ {expression} {{glossary}} {volume}';
+            const { note } = await client.anki.buildNote(entries[0], { extraMarkers: { series, volume: '3' } });
             expect(note.fields.Source).toBe(series);
             expect(note.deckName).toBe(`Mining::${series}`);
             expect(note.tags).toEqual(['yomitan', series]);
+            const profile = client.profile.get();
+            profile.options.anki.tags = ['{expression}'];
+            await client.profile.set(profile);
+            const reserved = await client.anki.buildNote(entries[0], { extraMarkers: { expression: 'app' } });
+            expect(reserved.note.tags).toEqual(['{expression}']);
+            await client.dispose();
+        });
+
+        test('structured content cannot add attributes or style declarations', async ({ expect }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            await storage.addWithResult('dictionaries', {
+                title: 'Evil',
+                revision: '1',
+                version: 3,
+                sequenced: false,
+                importDate: 0,
+                importSuccess: true,
+                prefixWildcardsSupported: true,
+                counts: { terms: { total: 1 } },
+                styles: '',
+            });
+            const glossary = [
+                {
+                    type: 'structured-content',
+                    content: [
+                        { tag: 'span', data: { 'x onmouseover': 'alert(1)', ok: 'yes' }, content: 'data' },
+                        { tag: 'span', style: { color: 'red; position: fixed; inset: 0' }, content: 'style' },
+                    ],
+                },
+            ];
+            await storage.bulkAdd(
+                'terms',
+                [
+                    {
+                        expression: '悪',
+                        reading: 'あく',
+                        definitionTags: '',
+                        rules: '',
+                        score: 0,
+                        glossary,
+                        dictionary: 'Evil',
+                        expressionReverse: '悪',
+                        readingReverse: 'くあ',
+                    },
+                ],
+                0,
+                1,
+            );
+            await storage.close();
+            const client = await createYomitan({ storage });
+            await client.profile.syncDictionaries();
+            const html = await client.render.html((await client.lookup.terms('悪')).entries);
+            expect(html).toContain('data-sc-ok="yes"');
+            expect(html).not.toContain('onmouseover');
+            expect(html).not.toContain('position: fixed');
             await client.dispose();
         });
 
@@ -277,6 +333,7 @@ export function runRenderAnkiContract(label: string, createStorage: CreateClient
             await transport.addNote((await client.anki.buildNote(entries[0])).note);
             const [states] = await controller.getNoteStates([entries[0]]);
             expect(states.cardFormats[0]).toMatchObject({ action: 'disabled' });
+            await expect(controller.addNote(entries[0], 0)).rejects.toThrow('cannot read notes');
             await client.dispose();
         });
 

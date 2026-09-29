@@ -371,6 +371,10 @@ export class StringStyle {
             this.removeProperty(propertyName);
             return;
         }
+        if (!isSingleStyleValue(String(value))) {
+            // Browsers ignore a value that isn't one valid value, such as `red; position: fixed`.
+            return;
+        }
         this.properties.set(propertyName, normalizeStyleValue(String(value)));
         this.sync();
     }
@@ -427,6 +431,42 @@ function createStyleProxy(style: StringStyle): StringStyle & Record<string, stri
     }) as StringStyle & Record<string, string>;
 }
 
+/** Browsers reject attribute names with whitespace, NUL, `/`, `>`, `=` or quotes. */
+const VALID_ATTRIBUTE_NAME = /^[^\s\0"'>/=]+$/;
+
+/** The DOMException browsers throw, for upstream code that catches it. */
+export class DomError extends Error {
+    constructor(name: string, message: string) {
+        super(message);
+        this.name = name;
+    }
+}
+
+/** True unless the value has a top-level `;`, `{`, `}` or `!` (outside quotes and brackets). */
+function isSingleStyleValue(value: string): boolean {
+    let quote: string | null = null;
+    let depth = 0;
+    for (let i = 0; i < value.length; ++i) {
+        const char = value[i];
+        if (quote !== null) {
+            if (char === '\\') {
+                ++i;
+            } else if (char === quote) {
+                quote = null;
+            }
+        } else if (char === '"' || char === "'") {
+            quote = char;
+        } else if (char === '(' || char === '[') {
+            ++depth;
+        } else if (char === ')' || char === ']') {
+            depth = Math.max(0, depth - 1);
+        } else if (char === '{' || char === '}' || ((char === ';' || char === '!') && depth === 0)) {
+            return false;
+        }
+    }
+    return quote === null;
+}
+
 function createDatasetProxy(element: StringElement): Record<string, string> {
     return new Proxy({} as Record<string, string>, {
         get(_target, property) {
@@ -437,6 +477,9 @@ function createDatasetProxy(element: StringElement): Record<string, string> {
         },
         set(_target, property, value) {
             if (typeof property === 'string') {
+                if (/-[a-z]/.test(property)) {
+                    throw new DomError('SyntaxError', `'${property}' is not a valid dataset property name.`);
+                }
                 element.setAttribute(`data-${camelToKebab(property)}`, String(value));
             }
             return true;
@@ -629,6 +672,9 @@ export class StringElement extends StringParentNode {
     }
 
     setAttribute(name: string, value: string): void {
+        if (!VALID_ATTRIBUTE_NAME.test(name)) {
+            throw new DomError('InvalidCharacterError', `'${name}' is not a valid attribute name.`);
+        }
         const attributeName = this.normalizeAttributeName(name);
         this.attributeMap.set(attributeName, String(value));
         if (attributeName === 'style') {
