@@ -358,6 +358,10 @@ Implementation note: the device gate is deferred. No Android SDK is available lo
 - **Install smoke tests.** Before publishing, pack each package and install it in a fresh project for its target: Vite for web, Node ESM, and the Expo harness for React Native. Import the entry points and run one lookup.
 - **Release.** Publish `2.0.0` once mokuro-reader has run on the release candidate in production. Then start the [roadmap](./roadmap.md) P0 items, audio first.
 
+> **Implementation note.** The scripts live in `scripts/release` and are described in `docs/releasing.md`. Two deviations:
+> - The React Native install smoke test bundles the package for the `react-native` condition. It doesn't run on a device; the Expo harness is a manual pre-release step (see milestone 4).
+> - npm trusted publishing can't create a package. So each `@yomitan-core/*` package is published once by hand, and its trusted publisher is configured before CI can publish it. Until then, CI skips it with a warning.
+
 ## 6. mokuro-reader migration checklist
 
 Today's features must keep working (survey of `~/code/mokuro-reader`, branch `codex/yomitan-core-v2-prerelease`):
