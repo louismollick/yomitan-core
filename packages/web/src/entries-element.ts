@@ -61,7 +61,11 @@ function getRenderer(): Promise<EntryRenderer<HTMLElement>> {
 
 const INTERNAL_LINK_PREFIX = 'yomitan://lookup/search.html';
 
-export class YomitanEntriesElement extends HTMLElement {
+/** Lets the module load where there is no DOM (SSR, Node); the element itself needs a browser. */
+const ElementBase: typeof HTMLElement =
+    typeof HTMLElement === 'undefined' ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
+
+export class YomitanEntriesElement extends ElementBase {
     /** The client that owns the dictionaries and profile. Required before `entries` are shown. */
     client: Yomitan | null = null;
     /** Enables Anki buttons, following the profile's card formats. */
