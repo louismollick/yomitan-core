@@ -4,13 +4,19 @@ on:
   push:
     branches:
       - '**'
+  workflow_dispatch:
+    inputs:
+      release-candidate:
+        description: Publish a release candidate (x.y.z-rc.N) under the rc dist-tag
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   publish-prerelease:
-    if: github.ref_name != 'main' && github.ref_name != 'master'
+    if: github.event_name == 'push' && github.ref_name != 'main' && github.ref_name != 'master'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,14 +71,58 @@ jobs:
       - name: Set prerelease version
         run: |
           base_version="$(node -p "require('./packages/core/package.json').version")"
-          prerelease_version="${base_version}-${{ steps.prerelease.outputs.prerelease_id }}.${{ github.run_id }}.${{ github.run_attempt }}"
-          npm version "$prerelease_version" --no-git-tag-version -w yomitan-core --workspaces-update=false
+          node scripts/release/set-version.mjs "${base_version}-${{ steps.prerelease.outputs.prerelease_id }}.${{ github.run_id }}.${{ github.run_attempt }}"
+
+      - name: Build
+        run: npm run build
+
+      - name: Install smoke tests
+        run: node scripts/release/install-smoke.mjs
 
       - name: Publish prerelease
-        run: npm publish -w yomitan-core --tag "${{ steps.prerelease.outputs.dist_tag }}"
+        run: node scripts/release/publish.mjs --tag "${{ steps.prerelease.outputs.dist_tag }}"
+
+  publish-release-candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.release-candidate && github.ref_name != 'main' && github.ref_name != 'master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup npm
+        run: |
+          npm install --global npm@^11.5.1
+          npm --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set release candidate version
+        run: |
+          base_version="$(node -p "require('./packages/core/package.json').version")"
+          node scripts/release/set-version.mjs "${base_version}-rc.${{ github.run_number }}"
+
+      - name: Build
+        run: npm run build
+
+      - name: Install smoke tests
+        run: node scripts/release/install-smoke.mjs
+
+      - name: Publish release candidate
+        run: node scripts/release/publish.mjs --tag rc
 
   publish:
-    if: github.ref_name == 'main' || github.ref_name == 'master'
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,6 +140,7 @@ jobs:
         with:
           node-version: 22.14.0
           cache: npm
+          registry-url: https://registry.npmjs.org
 
       - name: Setup npm
         run: |
@@ -107,8 +158,8 @@ jobs:
           -p semantic-release
           -p @semantic-release/changelog
           -p @semantic-release/commit-analyzer
+          -p @semantic-release/exec
           -p @semantic-release/git
           -p @semantic-release/github
-          -p @semantic-release/npm
           -p @semantic-release/release-notes-generator
           semantic-release

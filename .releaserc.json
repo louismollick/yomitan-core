@@ -13,10 +13,10 @@
       }
     ],
     [
-      "@semantic-release/npm",
+      "@semantic-release/exec",
       {
-        "npmPublish": true,
-        "pkgRoot": "packages/core"
+        "prepareCmd": "node scripts/release/set-version.mjs ${nextRelease.version} && npm install --package-lock-only --ignore-scripts && npm run build && node scripts/release/install-smoke.mjs",
+        "publishCmd": "node scripts/release/publish.mjs --tag latest"
       }
     ],
     "@semantic-release/github",
@@ -24,7 +24,7 @@
       "@semantic-release/git",
       {
         "assets": [
-          "packages/core/package.json",
+          "packages/*/package.json",
           "package-lock.json",
           "CHANGELOG.md"
         ],
