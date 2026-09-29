@@ -186,10 +186,12 @@ export function exposeYomitan(endpoint: MessageEndpoint, yomitan: Yomitan): () =
                     await new Promise<void>((resolve) => {
                         ack.resolve = resolve;
                     });
+                // A cancel that raced a finished import still wins, as it does in-process (the import
+                // added a new dictionary only). Updates and deletes past their commit point report success.
                 if (controller.signal.aborted && path === 'dictionaries.import') {
                     await yomitan.dictionaries.delete((value as { title: string }).title);
+                    throw new YomitanAbortError();
                 }
-                if (controller.signal.aborted) throw new YomitanAbortError();
                 const profile = PROFILE_WRITES.has(path) ? yomitan.profile.get() : undefined;
                 endpoint.postMessage({ type: 'result', id, value, profile } satisfies Response, transferables(value));
             } catch (error) {

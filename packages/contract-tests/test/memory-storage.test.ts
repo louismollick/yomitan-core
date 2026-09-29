@@ -71,3 +71,17 @@ test('memory: recovery removes a dictionary after replacement deletion fails', a
         await client.dispose();
     }
 });
+
+test('memory: recovery keeps an installed dictionary when a same-title import died before writing', async ({
+    expect,
+}) => {
+    const storage = createMemoryStorage();
+    const client = await createYomitan({ storage });
+    await client.dictionaries.import({ source: await createDictionaryArchive('valid-dictionary1') });
+    const session = await storage.sessions.begin('import', 'Test Dictionary');
+    session.abandon();
+    expect(await recoverWriteSessions(storage, storage.sessions)).toEqual([]);
+    expect((await client.dictionaries.list()).map(({ title }) => title)).toEqual(['Test Dictionary']);
+    expect(await storage.sessions.listStale()).toEqual([]);
+    await client.dispose();
+});

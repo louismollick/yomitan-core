@@ -9,7 +9,13 @@
 
 import type { DictionaryStorage, WriteGuard } from './types';
 
-export type WriteKind = 'import' | 'delete';
+/**
+ * What a session may have written, which decides what recovery removes:
+ * - `import`: a new dictionary only. An installed dictionary with the same title predates it (the
+ *   importer refuses duplicates) or is its own finished import, so recovery keeps a complete one.
+ * - `replace` and `delete`: everything under the title is being removed, so recovery finishes that.
+ */
+export type WriteKind = 'import' | 'replace' | 'delete';
 
 export type WriteSessionRecord = {
     id: string;
@@ -94,6 +100,15 @@ export async function recoverWriteSessions(
             continue;
         }
         try {
+            const keep =
+                stale.kind === 'import' &&
+                (await storage.getDictionaryInfo()).some(
+                    ({ title, importSuccess }) => title === stale.title && importSuccess !== false,
+                );
+            if (keep) {
+                await claimed.end();
+                continue;
+            }
             await storage.withWriteGuard(claimed.guard).deleteDictionary(stale.title, 1000, () => {});
         } catch (error) {
             claimed.abandon();

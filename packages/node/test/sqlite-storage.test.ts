@@ -148,8 +148,9 @@ describe('SQLite write sessions', () => {
         await owner.prepare();
         await recoverer.prepare();
 
-        // The owner imports through its guarded view, then stalls (a suspended app, a killed process).
-        const session = await owner.sessions.begin('import', TITLE);
+        // The owner replaces through its guarded view, then stalls (a suspended app, a killed process).
+        // Recovery finishes a replace; a plain import that completed would be kept.
+        const session = await owner.sessions.begin('replace', TITLE);
         await importFixture(owner.withWriteGuard(session.guard) as ReturnType<typeof createNodeStorage>);
         expect(await recoverer.sessions.listLiveTitles()).toEqual(new Set([TITLE]));
         expect(await recoverWriteSessions(recoverer, recoverer.sessions)).toEqual([]);

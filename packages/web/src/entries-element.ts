@@ -35,14 +35,15 @@ export function scopeCssToHost(css: string): string {
 
 /** Buttons Yomitan shows for features this element does not provide yet (audio, the entry menu). */
 const HIDDEN_ACTIONS_CSS = `
-@font-face {
-    font-family: kanji-stroke-orders;
-    src: url('${new URL('../assets/kanji-stroke-orders.ttf', import.meta.url).href}');
-}
 .action-button[data-action="play-audio"],
 .action-button[data-action="menu"] { display: none !important; }
-:host { display: block; }
+:host { display: block; color: var(--text-color); background-color: var(--background-color); }
 `;
+
+/** Yomitan's kanji stroke-order font is 18 MB, so it is opt-in: pass the URL you host it at. */
+function strokeOrderFontCss(url: string | null): string {
+    return url === null ? '' : `@font-face { font-family: kanji-stroke-orders; src: url(${JSON.stringify(url)}); }\n`;
+}
 
 let sharedRenderer: Promise<EntryRenderer<HTMLElement>> | null = null;
 
@@ -71,6 +72,8 @@ export class YomitanEntriesElement extends HTMLElement {
     extraMarkers: Record<string, string> | undefined = undefined;
     /** Theme inputs for Yomitan's `browser` and `site` themes. */
     themeContext: ThemeContext | undefined = undefined;
+    /** Where you host Yomitan's `kanji-stroke-orders.ttf` (18 MB, not bundled); strokes show only if set. */
+    strokeOrderFontUrl: string | null = null;
 
     private entryList: DictionaryEntry[] = [];
     private readonly root: ShadowRoot;
@@ -130,7 +133,8 @@ export class YomitanEntriesElement extends HTMLElement {
         }
         const options = client.profile.get().options;
         this.applyHostOptions(client, options);
-        this.styleElement.textContent = scopeCssToHost(css) + HIDDEN_ACTIONS_CSS;
+        this.styleElement.textContent =
+            strokeOrderFontCss(this.strokeOrderFontUrl) + scopeCssToHost(css) + HIDDEN_ACTIONS_CSS;
         renderer.setLanguage(options.general.language);
         this.revokeObjectUrls();
         const nodes = this.entryList.map((entry, index) => {

@@ -252,7 +252,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
         try {
             throwIfAborted(signal);
             await recoverWriteSessions(storage, storage.sessions);
-            session = await storage.sessions.begin('import', title);
+            session = await storage.sessions.begin(replace ? 'replace' : 'import', title);
         } catch (error) {
             await reader.close?.();
             throw error;
