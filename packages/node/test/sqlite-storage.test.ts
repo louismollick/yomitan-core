@@ -29,6 +29,26 @@ async function importFixture(storage: ReturnType<typeof createNodeStorage>) {
 }
 
 describe('SQLite storage', () => {
+    test('takes the write lock before the transaction callback, and rolls back failed writes', async () => {
+        const path = tempPath();
+        const storage = createNodeStorage(path);
+        await storage.prepare();
+        const competitor = new Database(path, { timeout: 0 });
+        const original = new Error('write failed');
+        await expect(
+            storage.sql.transaction(async () => {
+                expect(() => competitor.exec('BEGIN IMMEDIATE')).toThrow('database is locked');
+                await storage.sql.driver.run("INSERT INTO yomitan_meta VALUES ('rollback-test', 'x')");
+                throw original;
+            }),
+        ).rejects.toBe(original);
+        expect(await storage.sql.driver.all("SELECT * FROM yomitan_meta WHERE key = 'rollback-test'")).toEqual([]);
+        competitor.exec('BEGIN IMMEDIATE');
+        competitor.exec('ROLLBACK');
+        competitor.close();
+        await storage.close();
+    });
+
     test('prefix and suffix term queries use an index', async () => {
         const path = tempPath();
         const storage = createNodeStorage(path);

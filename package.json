@@ -6,6 +6,7 @@
   "workspaces": [
     "packages/core",
     "packages/node",
+    "packages/react-native",
     "packages/contract-tests"
   ],
   "scripts": {

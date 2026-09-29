@@ -128,22 +128,27 @@ export class SqlBackend implements StorageBackend {
 
     open(): Promise<void> {
         return this.mutex.run(async () => {
-            await this.driver.open();
-            await this.driver.exec(createSchemaSql());
-            const rows = await this.driver.all<{ value: string }>(
-                "SELECT value FROM yomitan_meta WHERE key = 'schemaVersion'",
-            );
-            if (rows.length === 0) {
-                await this.driver.run("INSERT INTO yomitan_meta (key, value) VALUES ('schemaVersion', ?)", [
-                    String(SQL_SCHEMA_VERSION),
-                ]);
-                return;
-            }
-            const version = Number(rows[0].value);
-            if (version > SQL_SCHEMA_VERSION) {
-                throw new Error(
-                    `Dictionary database schema version ${version} is newer than this yomitan-core supports (${SQL_SCHEMA_VERSION})`,
+            try {
+                await this.driver.open();
+                await this.driver.exec(createSchemaSql());
+                const rows = await this.driver.all<{ value: string }>(
+                    "SELECT value FROM yomitan_meta WHERE key = 'schemaVersion'",
                 );
+                if (rows.length === 0) {
+                    await this.driver.run("INSERT INTO yomitan_meta (key, value) VALUES ('schemaVersion', ?)", [
+                        String(SQL_SCHEMA_VERSION),
+                    ]);
+                    return;
+                }
+                const version = Number(rows[0].value);
+                if (version > SQL_SCHEMA_VERSION) {
+                    throw new Error(
+                        `Dictionary database schema version ${version} is newer than this yomitan-core supports (${SQL_SCHEMA_VERSION})`,
+                    );
+                }
+            } catch (error) {
+                await this.driver.close().catch(() => {});
+                throw error;
             }
         });
     }
@@ -254,13 +259,24 @@ export class SqlBackend implements StorageBackend {
     /** Runs `fn` in one write transaction, serialized with every other backend call. */
     transaction<T>(fn: () => Promise<T>): Promise<T> {
         return this.mutex.run(async () => {
-            await this.driver.exec('BEGIN IMMEDIATE');
+            const savepoint = this.driver.writeTransaction === 'savepoint';
+            await this.driver.exec(savepoint ? 'SAVEPOINT yomitan_write' : 'BEGIN IMMEDIATE');
             try {
                 const result = await fn();
-                await this.driver.exec('COMMIT');
+                await this.driver.exec(savepoint ? 'RELEASE yomitan_write' : 'COMMIT');
                 return result;
             } catch (error) {
-                await this.driver.exec('ROLLBACK');
+                try {
+                    if (savepoint) {
+                        await this.driver.exec('ROLLBACK TO yomitan_write');
+                        await this.driver.exec('RELEASE yomitan_write');
+                    } else {
+                        await this.driver.exec('ROLLBACK');
+                    }
+                } catch {
+                    // End the outer transaction if savepoint cleanup fails; preserve the write error.
+                    await this.driver.exec('ROLLBACK').catch(() => {});
+                }
                 throw error;
             }
         });

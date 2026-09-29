@@ -45,3 +45,6 @@ jobs:
           REQUIRE_HERMES: '1'
           HERMES_BIN: /home/runner/.jsvu/bin/hermes
         run: npm run verify
+
+      - name: React Native adapter contracts
+        run: npm run test -w @yomitan-core/react-native
