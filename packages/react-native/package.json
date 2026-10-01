@@ -4,6 +4,9 @@
   "description": "React Native SQLite storage and unpacked dictionary archive reader for yomitan-core.",
   "type": "module",
   "license": "GPL-3.0-or-later",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/louismollick/yomitan-core.git",

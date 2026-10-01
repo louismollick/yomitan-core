@@ -4,6 +4,9 @@
   "description": "Node.js adapters for yomitan-core: SQLite storage over better-sqlite3 and file-system dictionary sources.",
   "type": "module",
   "license": "GPL-3.0-or-later",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/louismollick/yomitan-core.git",

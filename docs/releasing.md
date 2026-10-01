@@ -21,7 +21,7 @@ Consumers pin exact prerelease versions (for example `2.0.0-pr.8.123.1`), never 
 ## One-time setup for a new package
 
 npm trusted publishing (OIDC, no token) only works for a package that already exists. For each new `@yomitan-core/*` package:
-1. Publish it once by hand as a prerelease, for example `npm publish -w @yomitan-core/web --tag next` after `node scripts/release/set-version.mjs 2.0.0-next.0`. This needs your npm account, which must own the `@yomitan-core` scope.
+1. Publish it once by hand as a prerelease, for example `npm publish -w @yomitan-core/web --tag next --access public` after `node scripts/release/set-version.mjs 2.0.0-next.0`. This needs your npm account, which must own the `@yomitan-core` scope. The adapter manifests also set `publishConfig.access` to `public`, since npm otherwise defaults new scoped packages to private visibility.
 2. On npmjs.com, add the trusted publisher: GitHub repository `louismollick/yomitan-core`, workflow `publish-npm.yml`.
 
 Until then, prereleases and release candidates publish the packages that exist and skip the others with a warning. A release to `latest` refuses to start unless all four packages exist.
