@@ -1,0 +1,42 @@
+{
+  "name": "@yomitan-core/react-native",
+  "version": "2.0.0",
+  "description": "React Native SQLite storage and unpacked dictionary archive reader for yomitan-core.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/louismollick/yomitan-core.git",
+    "directory": "packages/react-native"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "yomitan-core": "2.0.0"
+  },
+  "peerDependencies": {
+    "@op-engineering/op-sqlite": "^17.1.0",
+    "react-native": ">=0.76"
+  },
+  "devDependencies": {
+    "@yomitan-core/node": "2.0.0",
+    "@op-engineering/op-sqlite": "^17.1.0",
+    "better-sqlite3": "^12.4.1"
+  }
+}

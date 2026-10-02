@@ -1,0 +1,2 @@
+// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+export default "{{<<<<<<<}}\n{{#*inline \"selection-text\"}}\n    {{~#if (hasMedia \"selectionText\")}}{{{getMedia \"selectionText\"}}}{{/if~}}\n{{/inline}}\n{{=======}}\n{{#*inline \"popup-selection-text\"}}\n    {{~#if (hasMedia \"popupSelectionText\")}}{{{getMedia \"popupSelectionText\"}}}{{/if~}}\n{{/inline}}\n{{>>>>>>>}}";

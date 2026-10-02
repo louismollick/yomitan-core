@@ -159,7 +159,7 @@ Each row is a module; the interface column says what a caller needs to know.
 | --- | --- | --- | --- |
 | **Lookup engine** | The `lookup` namespace | Re-ported upstream translator, language transformer, text processors (array variants, #2312), and scanning parser. The profile → `FindTermsOptions` mapping is re-ported from upstream `backend.js` (`_getTranslatorFindTermsOptions`, text-replacement compilation, merge-mode main dictionary, `maxResults`). The parse cache and the translator's tag cache are invalidated on import and delete. | none (in-process) |
 | **Storage** | Yomitan's dictionary query interface: `findTermsBulk`, `findTermsExactBulk`, `findTermsBySequenceBulk`, `findTermMetaBulk`, `findKanjiBulk`, `findKanjiMetaBulk`, `findTagMetaBulk`, `getDictionaryInfo`, `getMedia`, plus `getCounts`, `deleteDictionary`, `beginImport() → ImportSession { add(kind, rows), commit(), abort() }` | The rules shared by every adapter live in core, above the seam: row → entry mapping, match-type rules, staged visibility | IndexedDB (web), SQL (core) |
-| **SQL storage** | `SqlDriver { exec, run, all, transaction }` | Schema, versioned migrations, and range queries for prefix/suffix search (`>= ? AND < ?` on forward and reverse columns; no `LIKE`). Import batching uses savepoints driven by the SQL storage itself, never by a driver's implicit batch transaction. Batch semantics differ between drivers: op-sqlite 17.1's JS `executeBatch` wraps `BEGIN`/`COMMIT` via `executeSync`, while its native batch runs in autocommit. substreamer's `db/client.ts` documents that a JS-thread `BEGIN` hard-fails on Android while a pool transaction is open. So `SqlDriver.transaction` is implemented per driver, and the op-sqlite driver pins `^17.1`. A metadata table records the schema version and the engine version that wrote the file, so prebuilt databases are portable (ADR-0004). | better-sqlite3 (node), op-sqlite (react-native), in-memory driver (tests) |
+| **SQL storage** | `SqlDriver { open, exec, run, all, runMany?, close }` | Schema, versioned migrations, and range queries for prefix/suffix search (`>= ? AND < ?` on forward and reverse columns; no `LIKE`). SQL storage drives writes with savepoints, never a driver's implicit batch transaction. Batch semantics differ between drivers: op-sqlite 17.1's JS `executeBatch` wraps `BEGIN`/`COMMIT` via `executeSync`, while its native batch runs in autocommit. substreamer's `db/client.ts` documents that a JS-thread `BEGIN` hard-fails on Android while a pool transaction is open. The op-sqlite driver sends individual statements through async `execute` and pins `^17.1`. A metadata table records the schema version, so prebuilt databases are portable (ADR-0004). | better-sqlite3 (node), op-sqlite (react-native) |
 | **Import** | `dictionaries.import({ source })` where `source` is plain data: bytes, `Blob`, `{ url }`, `{ path }` or `{ directory }`. The last two are resolved by `ArchiveReader`s registered at construction. | Upstream importer logic, precompiled schema validators (no `new Function`), a single validate-and-convert pass per bank, and image dimensions through an `ImageInfoReader` seam. Upstream decodes each image with `Image()` and **fails the import** if decoding fails, so image handling is its own adapter: <br>• **Default adapter (every target):** a format-aware parser. &nbsp;&nbsp;– PNG IHDR; GIF logical screen; JPEG SOFn marker scan; WebP VP8/VP8L/VP8X; BMP. &nbsp;&nbsp;– SVG `width`/`height` in absolute units, otherwise `viewBox`. &nbsp;&nbsp;– Hard limits on scanned bytes. &nbsp;&nbsp;– An unparseable raster image fails the import, as upstream does. &nbsp;&nbsp;– An SVG with no intrinsic size records 0×0, a listed deviation from Chromium's `naturalWidth`. <br>• **Browser-decoder adapter (web):** decodes with `Image()`, for exact parity. <br>• **Parity check:** both adapters are compared on an image corpus (upstream's test dictionary plus real Jitendex and 三省堂 images).<br><br>**Version check.** The `minimumYomitanVersion` check compares against the **Yomitan release version of the parity pin**, recorded in `PROVENANCE.md`, not against yomitan-core's own version. Dictionaries declare Yomitan versions such as `24.1.1.0`, so comparing them with `2.0.0` would reject valid dictionaries. | Zip reader over bytes/Blob (zip.js, no workers); directory reader (React Native native unzip, Node fs) |
 | **Import coordination** | Implicit. At most one import **or** delete runs per database at a time; others wait or fail with `busy`. Staged rows are recovered on open. | Each write session row records `{ id, kind: import \| delete, ownerToken, startedAt, heartbeatAt }`. There are two liveness mechanisms, one per storage kind:<br>• **Browser (IndexedDB):** imports **and deletes** hold the Web Lock `yomitan-write:<db>` (`navigator.locks`) for the session's lifetime. Recovery may delete a session's staged rows only if `navigator.locks.request(name, { ifAvailable: true })` succeeds. The lock is released automatically when a tab crashes or closes, while a suspended tab still holds it, so its import is never touched.<br>• **SQL (Node, React Native):** there are no cross-process locks. The owner renews `heartbeatAt` every 10 s in its own short write between import batches (inside a batch transaction the write would be invisible to other connections), and recovery deletes only sessions whose heartbeat is older than 2 minutes. <br>• **Stale owners.** Claiming a session is atomic: an `INSERT` that fails if any live session exists. Every batch write, heartbeat and commit first runs `UPDATE sessions … WHERE id = ? AND ownerToken = ?` inside the same transaction, and aborts with `session-lost` if no row matches. Recovery deletes the session row in the same transaction as its staged rows. So an owner that resumes after being recovered (for example a suspended React Native process) can't write or commit. <br>• lapis-style multi-process use gets correct recovery; concurrent writers fail fast with `busy`.<br>• **Tests:** &nbsp;&nbsp;– a two-tab Playwright test: tab B opens and tries a delete while tab A imports, then tab A is killed; &nbsp;&nbsp;– a two-process SQL test covering a crashed owner, and a **stale owner that resumes after recovery** and must fail with `session-lost`. | IndexedDB, SQL |
 | **Profile** | The `profile` namespace | Defaults, validation, upstream migrations, Yomitan settings import, dictionary sync | none |
@@ -256,12 +256,14 @@ Each milestone ends with `npm run verify` green, including the parity suite for 
 
 ### Milestone 1: engine and parity harness (L, in four slices)
 
+> **Implementation note (ADR-0009).** The engine is vendored verbatim rather than re-ported. Slices 1a and 1b therefore land together: all 60 languages arrive with the first sync, and the translator fixtures run 50/50 on the in-memory storage adapter from the first PR. The storage seam's third adapter is an **in-memory storage adapter**, not an in-memory SQL driver; it also backs the Hermes smoke test (ADR-0010).
+
 Each slice is its own PR, with its own fixtures green and a stated pass count in the PR description. The fixture harness comes before the bulk re-port, so every ported file lands with a test that already runs.
 
 **1a. Harness first (S)**
 - `contract-tests` skeleton, the fixture copy with `PROVENANCE.md`, and the deviation list.
 - A minimal re-port of the translator plus the Japanese language only, running the **45 Japanese** translator fixture cases at the internal translator seam. The other 5 (3 English, 1 Korean, 1 Latin) join in 1b.
-- SQL storage with the better-sqlite3 driver and the in-memory driver.
+- SQL storage with the better-sqlite3 driver, plus the in-memory storage adapter.
 - Exit: 45/45 Japanese translator cases pass, and `runStorageContract` runs against both drivers.
 
 **1b. Languages (M)**
@@ -280,6 +282,8 @@ Each slice is its own PR, with its own fixtures green and a stated pass count in
   - The two-process recovery test passes.
 
 **1d. Client, profile and lookup semantics (M)**
+
+> **Implementation note.** Audio source URL resolution moved to the audio fast follow (roadmap P0 #1): upstream's `AudioDownloader` builds requests through its extension-only `RequestBuilder`, so URL resolution and download are wired together there.
 - `createYomitan` with the `profile`, `dictionaries` and `lookup` namespaces.
 - `options-util` migration with bundled template patches.
 - Yomitan settings import.
@@ -291,9 +295,11 @@ Each slice is its own PR, with its own fixtures green and a stated pass count in
   - `options-util.test.js`, the profile-mapping goldens, the public-path translator cases, and the generated parse/scan goldens pass.
   - The single-text-node `document-util` sentence cases pass.
   - `runClientContract` passes in-process.
-  - The Hermes smoke test (import `valid-dictionary1`, then `terms`, `parse`, `scan` on the in-memory driver) passes.
+  - The Hermes smoke test (import `valid-dictionary1`, then `terms`, `parse`, `scan` on the in-memory storage adapter) passes.
 
 ### Milestone 2: Anki and HTML (M)
+
+> **Implementation note (ADR-0009).** Instead of a hand-written serializer, upstream's own `DisplayGenerator` and Anki template renderer run on a small built-in string DOM with browser-exact serialization. It reproduces every upstream Anki golden byte-for-byte and renders all fixture entries identically to jsdom. Semantic entry views (`render.views`) move to the React Native renderer and custom-layout roadmap items (#4, #7), their only consumers. Duplicate behaviour is profile-wide in Yomitan (`anki.duplicateBehavior`), not per card format.
 
 - **Snapshot-generator spike first (S).** Run upstream `DisplayGenerator` at the pin (jsdom, or Playwright as fallback) over the translator fixture entries, for term and kanji entries. Record what normalization is needed. Renderer work doesn't start until snapshots exist.
 - Entry views and the HTML renderer, including the media modes.
@@ -327,6 +333,8 @@ Each slice is its own PR, with its own fixtures green and a stated pass count in
 
 ### Milestone 4: React Native storage and streaming import (M)
 
+Implementation note: the device gate is deferred. No Android SDK is available locally; the headless Expo gate is planned for a manual iOS simulator run (`packages/react-native/harness/README.md`). The Node-backed op-sqlite double and Hermes bundle check run in CI meanwhile.
+
 - op-sqlite `SqlDriver`, pinned to `^17.1`. One connection per database file, with transactions driven by the SQL storage's own savepoints (see SQL storage in §3.3).
 - A directory archive reader for archives unpacked by native code, so dictionary banks are read one at a time and the archive is never held in JS memory.
 - The contract tests run in CI against a better-sqlite3-backed double that enforces op-sqlite's rules, so iteration stays fast.
@@ -350,6 +358,10 @@ Each slice is its own PR, with its own fixtures green and a stated pass count in
 - **Install smoke tests.** Before publishing, pack each package and install it in a fresh project for its target: Vite for web, Node ESM, and the Expo harness for React Native. Import the entry points and run one lookup.
 - **Release.** Publish `2.0.0` once mokuro-reader has run on the release candidate in production. Then start the [roadmap](./roadmap.md) P0 items, audio first.
 
+> **Implementation note.** The scripts live in `scripts/release` and are described in `docs/releasing.md`. Two deviations:
+> - The React Native install smoke test bundles the package for the `react-native` condition. It doesn't run on a device; the Expo harness is a manual pre-release step (see milestone 4).
+> - npm trusted publishing can't create a package. So each `@yomitan-core/*` package is published once by hand, and its trusted publisher is configured before CI can publish it. Until then, CI skips it with a warning.
+
 ## 6. mokuro-reader migration checklist
 
 Today's features must keep working (survey of `~/code/mokuro-reader`, branch `codex/yomitan-core-v2-prerelease`):
@@ -367,7 +379,7 @@ Today's features must keep working (survey of `~/code/mokuro-reader`, branch `co
 | Renderer with `prepareHost`, forced dark theme | `<yomitan-entries>` with profile theme | Light/dark both render; no host-page CSS leakage |
 | **Add to Anki**: overlaid button, own duplicate precheck, deck/model/field mapping, `syncAnkiWeb` after add | Display controller add action with Yomitan duplicate check; card format in `profile.anki.cardFormats`; mokuro keeps its own sync-after-add, triggered by the controller's `note-added` event | Add, duplicate state, and "view note" work against real AnkiConnect; cards contain `{sentence}` / cloze from the text box |
 | AnkiConnect URL setting, error toasts, **Android mode** (AnkiConnect Android, `androidModeOverride`) | mokuro passes its own `AnkiTransport`, a wrapper over its `ankiConnect()` client, with capabilities set per mode | Add works on desktop and on Android; the duplicate check falls back when `canAddNotesWithErrorDetail` is missing; "view note" is hidden when `guiBrowse` is missing |
-| `popupDuplicateBehavior` setting (declared but ignored today) | Card format `duplicateBehavior` (`new` / `overwrite` / `prevent`) | The setting now takes effect |
+| `popupDuplicateBehavior` setting (declared but ignored today) | Profile `anki.duplicateBehavior` (`new` / `overwrite` / `prevent`) | The setting now takes effect |
 | Persisted popup Anki settings (`popupDeckName`, `popupModelName`, `popupFieldMappings`, `tags`, and the skipped-field list) edited in `AnkiConnectSettings.svelte` | A **one-time conversion in mokuro** into `profile.anki.cardFormats[0]` (deck, model, fields, tags) and `profile.anki` duplicate options. mokuro's settings screen then edits the profile. | Upgrading a configured install keeps deck, model, field mappings and tags. There's a mokuro unit test for the conversion. |
 | `{series}` / `{volume}` in deck name, tags and fields, resolved from volume metadata | `buildNote(..., { extraMarkers: { series, volume } })`. Extra markers resolve in fields, deck name and tags; Yomitan's own markers take precedence on a name clash. | A card added from a volume lands in the resolved deck, with resolved tags. |
 | Dictionary enabled flags in localStorage (`preferences.ts`) | The one-time conversion copies enabled flags into `profile.dictionaries[]`. Order starts at install order, since the saved order was already being lost. | Previously disabled dictionaries stay disabled after the upgrade. |
@@ -416,3 +428,5 @@ Mokuro's own features stay in mokuro: the drawer, the navigation stack, the Japa
 | 0006 | Browser storage uses Yomitan's IndexedDB schema |
 | 0007 | Clean-break rewrite |
 | 0008 | Library owns entry actions; consumers own the popup |
+| 0009 | Vendor upstream engine modules verbatim (supersedes the hand re-port in §5) |
+| 0010 | Hermes compatibility tested with a Metro-equivalent pipeline |

@@ -1,0 +1,2 @@
+// Vendored from Yomitan by scripts/sync-upstream.mjs. Do not edit; see PROVENANCE.md.
+export default "{{#*inline \"clipboard-image\"}}\n    {{~#if definition.clipboardImageFileName~}}\n        <img src=\"{{definition.clipboardImageFileName}}\" />\n    {{~/if~}}\n{{/inline}}\n\n{{#*inline \"clipboard-text\"}}\n    {{~#if definition.clipboardText~}}{{definition.clipboardText}}{{~/if~}}\n{{/inline}}\n";

@@ -1,0 +1,19 @@
+{
+  "name": "@yomitan-core/contract-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Behavioural suites every yomitan-core storage adapter and client transport must pass, plus the upstream parity fixtures.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@zip.js/zip.js": "2.7.54",
+    "acorn": "^8.18.0"
+  }
+}
