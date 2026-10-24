@@ -1,3 +1,15 @@
+# [2.2.0](https://github.com/louismollick/yomitan-core/compare/v2.1.0...v2.2.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **anki:** unique media names, lazy audio sources and audio failure warnings ([75ccb49](https://github.com/louismollick/yomitan-core/commit/75ccb49b611b0832a484a6937e4ad7752e2a0458))
+
+
+### Features
+
+* **anki:** store screenshot, audio and dictionary media with notes ([b5d9c61](https://github.com/louismollick/yomitan-core/commit/b5d9c611dd7c4a12dc14bb9ac5fb3e51b3a7f963))
+
 # [2.1.0](https://github.com/louismollick/yomitan-core/compare/v2.0.0...v2.1.0) (2026-10-24)
 
 

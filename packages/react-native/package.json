@@ -1,6 +1,6 @@
 {
   "name": "@yomitan-core/react-native",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "React Native SQLite storage and unpacked dictionary archive reader for yomitan-core.",
   "type": "module",
   "license": "GPL-3.0-or-later",
@@ -32,7 +32,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "yomitan-core": "2.1.0"
+    "yomitan-core": "2.2.0"
   },
   "peerDependencies": {
     "@op-engineering/op-sqlite": "^17.1.0",
