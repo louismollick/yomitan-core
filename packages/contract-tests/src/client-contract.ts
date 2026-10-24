@@ -29,6 +29,10 @@ const TITLE = 'Test Dictionary';
  */
 async function createSegmentationArchive(frequencyMode?: 'rank-based' | 'occurrence-based'): Promise<ArrayBuffer> {
     const terms = [
+        ['見る', 'みる', 'v1'],
+        ['くせに', 'くせに'],
+        ['Tシャツ', 'てぃーしゃつ'],
+        ['シャツ', 'しゃつ'],
         ['その', 'その'],
         ['バー', 'ばー'],
         ['その場', 'そのば'],
@@ -40,7 +44,18 @@ async function createSegmentationArchive(frequencyMode?: 'rank-based' | 'occurre
         ['あいう', 'あいう'],
         ['いうえ', 'いうえ'],
     ];
-    const ranks: Record<string, number> = { その: 10, バー: 800, その場: 3000, から: 10, ん: 10, 下欄: 150000 };
+    const ranks: Record<string, number> = {
+        見る: 36,
+        くせに: 500,
+        Tシャツ: 2000,
+        シャツ: 3000,
+        その: 10,
+        バー: 800,
+        その場: 3000,
+        から: 10,
+        ん: 10,
+        下欄: 150000,
+    };
     const files: Record<string, string> = {
         'index.json': JSON.stringify({
             title: 'Segment Test',
@@ -49,7 +64,9 @@ async function createSegmentationArchive(frequencyMode?: 'rank-based' | 'occurre
             sequenced: false,
             ...(frequencyMode === undefined ? {} : { frequencyMode }),
         }),
-        'term_bank_1.json': JSON.stringify(terms.map(([term, reading]) => [term, reading, '', '', 0, ['def'], -1, ''])),
+        'term_bank_1.json': JSON.stringify(
+            terms.map(([term, reading, rules = '']) => [term, reading, '', rules, 0, ['def'], -1, '']),
+        ),
     };
     if (frequencyMode !== undefined) {
         files['term_meta_bank_1.json'] = JSON.stringify(
@@ -201,6 +218,55 @@ export function runClientContract(
             expect(tokenAt(tokens, 3)).toBe(second);
             expect(tokenAt(tokens, 4)).toBeUndefined();
             await client.dispose();
+        });
+
+        test('segment sees the shorter matches of an entry the longest match also covers', async ({ expect }) => {
+            const client = await withSegmentation(createStorage, makeClient, 'rank-based');
+            // 見る matches as 見た and as 見たく; the Translator lists it once, as 見たく, for a grouped lookup.
+            const tokens = await client.lookup.segment('見たくせに');
+            expect(tokens.map(({ text }) => text)).toEqual(['見た', 'くせに']);
+            const looked = await client.lookup.terms('見た', { mode: 'group' });
+            expect(tokens[0].entries).toEqual(looked.entries);
+            await client.dispose();
+        });
+
+        test('segment keeps mixed-script words whole when alphanumeric scanning is on', async ({ expect }) => {
+            const client = await withSegmentation(createStorage, makeClient, 'rank-based');
+            expect((await client.lookup.segment('Ｔシャツ')).map(({ text }) => text)).toEqual(['Ｔシャツ']);
+            expect((await client.lookup.segment('abcシャツ')).map(({ text }) => text)).toEqual(['abc', 'シャツ']);
+            const profile = client.profile.get();
+            profile.options.scanning.alphanumeric = false;
+            await client.profile.set(profile);
+            expect((await client.lookup.segment('Tシャツ')).map(({ text }) => text)).toEqual(['T', 'シャツ']);
+            await client.dispose();
+        });
+
+        test('segment only ranks by a usable sort frequency dictionary', async ({ expect }) => {
+            const split = async (client: Yomitan) => (await client.lookup.segment('からん')).map(({ text }) => text);
+            const set = async (client: Yomitan, name: string | null, enabled = true) => {
+                const profile = client.profile.get();
+                profile.options.general.sortFrequencyDictionary = name;
+                profile.options.dictionaries[0].enabled = enabled;
+                await client.profile.set(profile);
+            };
+            const ranked = await withSegmentation(createStorage, makeClient, 'rank-based');
+            // A missing name falls through to the dictionary that has frequencies.
+            await set(ranked, 'Missing');
+            expect(await split(ranked)).toEqual(['から', 'ん']);
+            // A disabled one has nothing to rank with, so the fewest words win.
+            await set(ranked, 'Segment Test', false);
+            expect(await split(ranked)).toEqual(['からん']);
+            await ranked.dispose();
+            // Occurrence-based counts are not ranks.
+            const counted = await withSegmentation(createStorage, makeClient, 'occurrence-based');
+            await set(counted, 'Segment Test');
+            expect(await split(counted)).toEqual(['からん']);
+            await counted.dispose();
+            // No term frequencies at all.
+            const plain = await withSegmentation(createStorage, makeClient);
+            await set(plain, 'Segment Test');
+            expect(await split(plain)).toEqual(['からん']);
+            await plain.dispose();
         });
 
         test('segment falls back to the fewest words without a rank-based frequency dictionary', async ({ expect }) => {

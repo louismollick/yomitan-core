@@ -17,7 +17,7 @@ import {
     getFindKanjiOptions,
     getFindTermsOptions,
 } from '../lookup/find-options';
-import { type SegmentToken, segmentText } from '../lookup/segment';
+import { type DictionaryMatch, type SegmentToken, type TermFrequencyRecord, segmentText } from '../lookup/segment';
 import { type ParseToken, type ScanResult, parseText, scanText, sentenceAt } from '../lookup/text-lookup';
 import type { Sentence } from '../lookup/text-source';
 import { type AbortSignalLike, type BlobLike, isBlobLike } from '../platform/types';
@@ -65,6 +65,13 @@ export type CreateYomitanOptions = {
 };
 
 export type InstalledDictionary = Summary;
+
+/** The parts of the Translator's internal deinflection result that `segment` reads. */
+type TranslatorDeinflection = {
+    originalText: string;
+    deinflectedText: string;
+    databaseEntries: { term: string; reading: string }[];
+};
 
 export type RecommendedDictionary = {
     name: string;
@@ -166,6 +173,13 @@ export async function createYomitan(options: CreateYomitanOptions) {
             options: unknown,
         ): Promise<{ dictionaryEntries: TermDictionaryEntry[]; originalTextLength: number }>;
         findKanji(text: string, options: unknown): Promise<KanjiDictionaryEntry[]>;
+        getTermFrequencies(
+            termReadingList: { term: string; reading: string | null }[],
+            dictionaries: string[],
+        ): Promise<TermFrequencyRecord[]>;
+        // Internals `segment` needs: the matches before `findTerms` keeps only the longest per entry.
+        _getDeinflections(text: string, options: unknown): Promise<TranslatorDeinflection[]>;
+        _getJapaneseChineseKoreanOnlyText(text: string): string;
     };
     translator.prepare();
     let disposed = false;
@@ -399,29 +413,67 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return await translator.findTerms('simple', text, getFindTermsOptions('simple', details, profile.options));
     };
 
-    /** Segmenting needs the matches of every length, so it asks for `group` mode without truncation. */
-    const findTermsForSegment = async (text: string, details: FindTermsDetails = {}) => {
-        return await translator.findTerms('group', text, getFindTermsOptions('group', details, profile.options));
+    /**
+     * Every headword matched at the start of `text`, at every length. `findTerms` keeps only the longest
+     * match of each database entry (見る matched by 見た and 見たく is listed once, as 見たく), which would
+     * hide the shorter words from the lattice, so this reads the Translator's matches before that.
+     */
+    const findSegmentMatches = async (text: string): Promise<DictionaryMatch[]> => {
+        const options = getFindTermsOptions('group', { matchType: 'exact', deinflect: true }, profile.options);
+        if (options.removeNonJapaneseCharacters && ['ja', 'zh', 'yue', 'ko'].includes(options.language)) {
+            text = translator._getJapaneseChineseKoreanOnlyText(text);
+        }
+        if (text.length === 0) {
+            return [];
+        }
+        const matches: DictionaryMatch[] = [];
+        for (const { originalText, deinflectedText, databaseEntries } of await translator._getDeinflections(
+            text,
+            options,
+        )) {
+            for (const { term, reading } of databaseEntries) {
+                matches.push({
+                    term,
+                    reading,
+                    length: originalText.length,
+                    deinflected: deinflectedText !== originalText,
+                });
+            }
+        }
+        return matches;
+    };
+
+    /** A lookup of just the span in `group` mode, untruncated. */
+    const findSegmentEntries = async (span: string): Promise<TermDictionaryEntry[]> => {
+        const { dictionaryEntries } = await translator.findTerms(
+            'group',
+            span,
+            getFindTermsOptions('group', {}, profile.options),
+        );
+        return dictionaryEntries;
     };
 
     /**
      * The dictionary whose frequencies rank words for `segment`: the profile's sort frequency
-     * dictionary, else the first enabled dictionary with term frequencies. Occurrence-based dictionaries
-     * are skipped because they have no ranks.
+     * dictionary, else the first enabled dictionary, in profile order, that has term frequencies. A
+     * dictionary must be installed, enabled and rank-based: occurrence-based ones have no ranks.
      */
     const getSegmentFrequencyDictionary = async (): Promise<string | null> => {
-        const { sortFrequencyDictionary } = profile.options.general;
-        if (sortFrequencyDictionary !== null) {
-            return sortFrequencyDictionary;
-        }
+        const { dictionaries, general } = profile.options;
         const installed = await listInstalled();
-        for (const { name, enabled } of profile.options.dictionaries) {
+        const usable = (name: string) => {
             const summary = installed.find(({ title }) => title === name);
-            if (enabled && summary?.frequencyMode !== 'occurrence-based' && (summary?.counts?.termMeta.freq ?? 0) > 0) {
-                return name;
-            }
+            return (
+                dictionaries.some((dictionary) => dictionary.name === name && dictionary.enabled) &&
+                summary?.frequencyMode !== 'occurrence-based' &&
+                (summary?.counts?.termMeta.freq ?? 0) > 0
+            );
+        };
+        const preferred = general.sortFrequencyDictionary;
+        if (preferred !== null && usable(preferred)) {
+            return preferred;
         }
-        return null;
+        return dictionaries.find(({ name }) => usable(name))?.name ?? null;
     };
 
     const ankiNotes = new AnkiNotes();
@@ -588,7 +640,28 @@ export async function createYomitan(options: CreateYomitanOptions) {
              */
             async segment(text: string): Promise<SegmentToken[]> {
                 assertUsable();
-                return segmentText(text, profile.options, findTermsForSegment, await getSegmentFrequencyDictionary());
+                const { scanning, general } = profile.options;
+                const frequencyDictionary = await getSegmentFrequencyDictionary();
+                return segmentText(
+                    text,
+                    {
+                        scanLength: scanning.length,
+                        maxResults: general.maxResults,
+                        alphanumeric: scanning.alphanumeric,
+                    },
+                    {
+                        matches: findSegmentMatches,
+                        frequencies:
+                            frequencyDictionary === null
+                                ? null
+                                : (terms) =>
+                                      translator.getTermFrequencies(
+                                          terms.map((term) => ({ term, reading: null })),
+                                          [frequencyDictionary],
+                                      ),
+                        entries: findSegmentEntries,
+                    },
+                );
             },
             /** The sentence around `[offset, offset + length)` under the profile's sentence rules. */
             sentence(text: string, offset: number, length = 0): Sentence {

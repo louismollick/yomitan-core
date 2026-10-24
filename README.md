@@ -20,7 +20,7 @@ const tokens = await client.lookup.segment(text);
 const token = tokenAt(tokens, offset); // token whose UTF-16 range contains offset
 ```
 
-Words are scored by `ln(frequency rank) + 6` (+1.5 if deinflected), unmatched Japanese characters cost 20. Ranks come from the profile's sort frequency dictionary, else the first enabled dictionary with term frequencies; occurrence-based dictionaries are skipped. With no usable frequency dictionary, the path with the fewest words wins, ties going to the longer first word.
+Words are scored by `ln(frequency rank) + 6` (+1.5 if deinflected). An unmatched Japanese character costs 20 and any other unmatched character 6, so a mixed-script word like Tシャツ beats its parts; letters and digits are looked up when `scanning.alphanumeric` is on (Yomitan's default). Ranks come from the profile's sort frequency dictionary, else the first enabled dictionary with term frequencies. A dictionary that is missing, disabled, occurrence-based or without term frequencies is skipped. With no usable frequency dictionary, the path with the fewest words wins, ties going to the longer first word.
 
 ## Development
 
