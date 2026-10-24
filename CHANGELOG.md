@@ -1,3 +1,15 @@
+# [2.1.0](https://github.com/louismollick/yomitan-core/compare/v2.0.0...v2.1.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **lookup:** keep every match length in segment and validate its inputs ([053ee3f](https://github.com/louismollick/yomitan-core/commit/053ee3f7eed0f76b32a38f936d60f2aa4a4bc970))
+
+
+### Features
+
+* **lookup:** add lattice segmenter ([260eca6](https://github.com/louismollick/yomitan-core/commit/260eca68b874bf8aea916228905bccfc80815060))
+
 # [2.0.0](https://github.com/louismollick/yomitan-core/compare/v1.7.0...v2.0.0) (2026-10-02)
 
 

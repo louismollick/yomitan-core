@@ -1,6 +1,6 @@
 {
   "name": "@yomitan-core/web",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Browser adapters for yomitan-core: IndexedDB storage with Yomitan's schema, the <yomitan-entries> element, and a web worker host.",
   "type": "module",
   "license": "GPL-3.0-or-later",
@@ -33,7 +33,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "yomitan-core": "2.0.0"
+    "yomitan-core": "2.1.0"
   },
   "devDependencies": {
     "fake-indexeddb": "6.0.0"

@@ -1,6 +1,6 @@
 {
   "name": "yomitan-core",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Headless Yomitan: dictionary import, lookup, rendering and Anki notes for browsers, Node and React Native.",
   "type": "module",
   "license": "GPL-3.0-or-later",
