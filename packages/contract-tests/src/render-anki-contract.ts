@@ -6,9 +6,18 @@
  */
 
 import { describe, test } from 'vitest';
-import { type CreateYomitanOptions, type Yomitan, createAnkiConnectTransport, createYomitan } from 'yomitan-core';
+import {
+    type CreateYomitanOptions,
+    type Yomitan,
+    createAnkiConnectTransport,
+    createStringDomEnvironment,
+    createYomitan,
+    findGlossImages,
+    setGlossImageSource,
+} from 'yomitan-core';
 import type { AnkiMediaSource, AnkiNote, AnkiNoteInfo, AnkiTransport } from '../../core/src/anki/anki';
 import { DuplicateNoteError, createDisplayController } from '../../core/src/display/display-controller';
+import type { StringDocument, StringElement } from '../../core/src/dom/string-dom';
 import type { CreateClientStorage } from './client-contract';
 import { createDictionaryArchive } from './fixtures';
 
@@ -130,6 +139,62 @@ export function runRenderAnkiContract(
                 media: { urlTemplate: 'app://m/{dictionary}/{path}' },
             });
             expect(templated).toContain('src="app://m/Test%20Dictionary/image.gif"');
+            await client.dispose();
+        });
+
+        test('splits an entry glossary per dictionary with the markup render.html uses', async ({ expect }) => {
+            const client = await importedClient(createStorage, makeClient);
+            await client.dictionaries.import({
+                source: await createDictionaryArchive('valid-dictionary1', { title: 'Second' }),
+            });
+            const profile = client.profile.get();
+            profile.options.dictionaries[1].alias = 'Alias';
+            await client.profile.set(profile);
+            const { entries } = await client.lookup.terms('画像');
+            const blocks = await client.render.glossaries(entries[0]);
+            expect(blocks.map(({ dictionary, dictionaryAlias }) => [dictionary, dictionaryAlias])).toEqual([
+                [TITLE, TITLE],
+                ['Second', 'Alias'],
+            ]);
+
+            // Each block holds the definition items render.html emits for that dictionary, in order.
+            const items = (html: string) => html.replace(/^<ol [^>]*>/, '').replace(/<\/ol>$/, '');
+            const full = await client.render.html([entries[0]]);
+            expect(full).toContain(blocks.map(({ html }) => items(html)).join(''));
+            expect(blocks[0].html).toMatch(
+                /^<ol class="definition-list" data-count="1"><li class="definition-item" data-dictionary="Test Dictionary"/,
+            );
+            expect(blocks[0].html).toContain('class="tag"');
+            expect(blocks[1].html).toContain('data-dictionary="Second"');
+            expect(blocks[1].html).not.toContain('data-dictionary="Test Dictionary"');
+            await client.dispose();
+        });
+
+        test('glossary images follow the media option and work with the gloss image helpers', async ({ expect }) => {
+            const client = await importedClient(createStorage, makeClient);
+            const { entries } = await client.lookup.terms('画像');
+            const [{ html: placeholder }] = await client.render.glossaries(entries[0]);
+            expect(placeholder).toMatch(/<a [^>]*class="gloss-image-link"[^>]*data-path="image.gif"/);
+            expect(placeholder).not.toMatch(/<img[^>]*src=/);
+            const [{ html: inlined }] = await client.render.glossaries(entries[0], { media: 'data-uri' });
+            expect(inlined).toContain('src="data:image/gif;base64,R0lGOD');
+            const [{ html: templated }] = await client.render.glossaries(entries[0], {
+                media: { urlTemplate: 'app://m/{dictionary}/{path}' },
+            });
+            expect(templated).toContain('src="app://m/Test%20Dictionary/image.gif"');
+
+            // The host fills placeholders itself.
+            const env = createStringDomEnvironment();
+            const parser = new (
+                env.DOMParser as new () => { parseFromString(html: string, type: string): StringDocument }
+            )();
+            const document = parser.parseFromString(`<body>${placeholder}</body>`, 'text/html');
+            const root = document.querySelector('.definition-list');
+            expect(root).not.toBeNull();
+            const images = findGlossImages(root as StringElement);
+            expect(images.map(({ dictionary, path }) => [dictionary, path])).toContainEqual([TITLE, 'image.gif']);
+            setGlossImageSource(images[0], 'blob:host/1');
+            expect(root?.querySelector('.gloss-image')?.getAttribute('src')).toBe('blob:host/1');
             await client.dispose();
         });
 

@@ -53,6 +53,7 @@ const METHODS = new Set([
     'lookup.segment',
     'lookup.sentence',
     'render.html',
+    'render.glossaries',
     'render.document',
     'render.css',
     'render.attributes',
@@ -316,6 +317,7 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
         },
         render: {
             html: remote('render.html'),
+            glossaries: remote('render.glossaries'),
             document: remote('render.document'),
             css: remote('render.css'),
             attributes: (theme?: Parameters<Yomitan['render']['attributes']>[0]) =>

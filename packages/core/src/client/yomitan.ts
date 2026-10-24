@@ -26,6 +26,7 @@ import { setUpstreamFetch } from '../platform/upstream-env';
 import { type Profile, ProfileFormat, syncDictionarySettings } from '../profile/profile';
 import { type ThemeContext, getCustomCss, getDisplayAttributes } from '../render/display-options';
 import { EntryRenderer, createStringDomEnvironment } from '../render/entry-renderer';
+import { type GlossaryBlock, groupGlossaryBlocks } from '../render/glossaries';
 import { type HtmlMediaMode, getPopupCss, renderHtmlDocument, resolveImages } from '../render/html';
 import { type KanjiTerm, isSingleKanji } from '../storage/kanji-term-index';
 import { recoverWriteSessions } from '../storage/sessions';
@@ -502,19 +503,22 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return media === undefined ? null : { mediaType: media.mediaType, content: new Uint8Array(media.content) };
     };
 
-    const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> => {
+    const renderEntryNodes = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<StringElement[]> => {
         stringRenderer ??= EntryRenderer.create<StringElement>(createStringDomEnvironment());
         const renderer = await stringRenderer;
         renderer.setLanguage(profile.options.general.language);
         const dictionaryInfo = await listInstalled();
-        let html = '';
+        const nodes: StringElement[] = [];
         for (const entry of entries) {
             const node = renderer.render(entry, dictionaryInfo);
             await resolveImages(node, media, getMediaBytes);
-            html += node.outerHTML;
+            nodes.push(node);
         }
-        return html;
+        return nodes;
     };
+
+    const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> =>
+        (await renderEntryNodes(entries, media)).map((node) => node.outerHTML).join('');
 
     /** Builds that are running, so concurrent calls for one dictionary share a scan. */
     const kanjiTermIndexBuilds = new Map<string, Promise<void>>();
@@ -778,6 +782,21 @@ export async function createYomitan(options: CreateYomitanOptions) {
             ): Promise<string> {
                 assertUsable();
                 return renderEntriesHtml(entries, media);
+            },
+            /**
+             * A term entry's definitions split by dictionary, in the entry's dictionary order, for hosts
+             * that render headwords, pitch, frequencies and actions themselves but keep Yomitan's glossary
+             * markup (structured content, images, definition tags). Style it with `css()` and
+             * `attributes()`, like `html()`; `media` works as in `html()`, and `findGlossImages` finds
+             * the images in rendered blocks.
+             */
+            async glossaries(
+                entry: TermDictionaryEntry,
+                { media = 'placeholder' }: { media?: HtmlMediaMode } = {},
+            ): Promise<GlossaryBlock[]> {
+                assertUsable();
+                const [node] = await renderEntryNodes([entry], media);
+                return groupGlossaryBlocks(entry, node);
             },
             /** A standalone HTML document of the entries, styled like Yomitan's popup (for WebViews). */
             async document(

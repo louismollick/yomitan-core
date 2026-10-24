@@ -116,6 +116,7 @@ export {
     createStringDomEnvironment,
     setGlossImageSource,
 } from './render/entry-renderer';
+export type { GlossaryBlock } from './render/glossaries';
 export { type HtmlMediaMode, getPopupCss } from './render/html';
 export type { KanjiTerm } from './storage/kanji-term-index';
 export { upstreamEnv, withUpstreamEnv } from './platform/upstream-env';
