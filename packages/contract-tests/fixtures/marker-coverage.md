@@ -9,4 +9,6 @@ Every marker `anki.markers()` returns, and the test that proves its output match
 | Dynamic `single-glossary-<dictionary>` | Client contract "builds notes from the profile card format" (content check); the template is upstream's `getDynamicTemplates` output |
 | Dynamic `single-frequency-number-<dictionary>` | Listed by `anki.markers()` (client contract); template is upstream's `getDynamicTemplates` output |
 | App-defined markers (`extraMarkers`, e.g. mokuro-reader's `{series}`, `{volume}`) | Client contract "builds notes from the profile card format" (fields, deck name, tags) |
-| Media markers with no media supplied (`audio`, `screenshot`, `clipboard-image`, `clipboard-text`, dictionary images in `{glossary}`) | Upstream golden renders them empty without media; media injection is roadmap #1–2 |
+| Media markers with no media supplied (`audio`, `screenshot`, `clipboard-image`, `clipboard-text`, dictionary images in `{glossary}`) | Upstream golden renders them empty without media (`anki-parity.test.ts`); the client contract "media markers render empty" covers a transport without `storeMediaFile` |
+| `screenshot`, `audio`, dictionary images in `{glossary}` with media | Client contract "stores the screenshot, audio and glossary images that media markers ask for" (file names, stored payloads and the rendered fields) |
+| `clipboard-image`, `clipboard-text`, `popup-selection-text`, `sentence-furigana` with media | Not supported; they render empty (see deviations) |

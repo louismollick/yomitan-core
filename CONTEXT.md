@@ -109,6 +109,10 @@ _Avoid_: note template, card type
 A named placeholder such as `{glossary}` or `{sentence}` that a field template expands.
 _Avoid_: tag, variable
 
+**Note media**:
+Files a note's fields refer to: a screenshot, term audio and dictionary images in the glossary. They are stored in Anki's media folder, and the note is built with their file names.
+_Avoid_: attachments, assets
+
 ### Audio
 
 **Audio source**:

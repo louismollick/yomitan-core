@@ -8,8 +8,9 @@ Intentional differences from upstream behaviour at the pinned commit. An unliste
 | Image sizes on import | Decoded with `Image()`; undecodable images fail the import | Read from file headers; an unreadable raster fails the import, an SVG without intrinsic size records 0×0, truncated image data is not detected | Works on every target without a decoder (plan §3.3) |
 | TIFF images | Fail to load in Chromium | Imported with their header size | Header parsing |
 | Profile | Multiple profiles, conditions | One profile; the full upstream options shape is kept | ADR-0002 |
-| Audio | Downloads, validates, plays | Not yet provided | Roadmap P0 #1 |
-| Anki media, `{sentence-furigana}` text parsing | Injected by the extension | Not yet provided; media markers render empty | Roadmap P0 #2 |
+| Audio | Downloads, validates, plays | `audio.urls` resolves playable URLs. Anki downloads `{audio}` itself (`storeMediaFile` with `url`), skipping JapanesePod101's placeholder by MD5. No library-side download, validation or playback yet | Roadmap P0 #1 |
+| Anki media | Screenshot, clipboard, audio and dictionary media injected by the extension | Screenshot (host bytes), audio and glossary images, when the transport has `storeMediaFile`; screenshot and audio file names add a random part to the timestamp (audio is not hashed because Anki downloads it). Clipboard image and text, and popup selection text, render empty. A media failure is a warning on `addNote`, where Yomitan shows an error and still adds | Roadmap P0 #2 |
+| `{sentence-furigana}` text parsing | Injected by the extension | Not provided; the marker renders empty | Roadmap P0 #2 |
 | Dictionary CSS sanitizing for Anki, outside browsers | `CSSStyleSheet` re-serialization | Rule splitting; `@import` dropped; whitespace not normalized | No CSSOM in Node/React Native |
 | Anki glossary style scoping, outside browsers | Per-rule selectors (`addScopeToCssLegacy`) | CSS nesting (upstream's own fallback, as in its jsdom goldens) | No CSSOM in Node/React Native |
 | Structured-content links | Allowed schemes enforced by the import schema only | Also enforced at render time (`http(s)` and internal links) | Prebuilt databases skip import validation |

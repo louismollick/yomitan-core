@@ -13,6 +13,7 @@ import {
     type DisplayController,
     EntryRenderer,
     type KanjiDictionaryEntry,
+    type NoteMedia,
     type TermDictionaryEntry,
     type ThemeContext,
     type Yomitan,
@@ -23,7 +24,14 @@ import {
 export type DictionaryEntry = TermDictionaryEntry | KanjiDictionaryEntry;
 export type KanjiClickDetail = { character: string };
 export type LinkClickDetail = { query: string; href: string };
-export type NoteAddedDetail = { entryIndex: number; cardFormatIndex: number; noteId: number; overwritten: boolean };
+export type NoteAddedDetail = {
+    entryIndex: number;
+    cardFormatIndex: number;
+    noteId: number;
+    overwritten: boolean;
+    /** Media that couldn't be stored; the note was added without it. */
+    warnings: string[];
+};
 export type NoteErrorDetail = { entryIndex: number; cardFormatIndex: number; error: unknown };
 
 /** Yomitan's CSS targets `:root[data-*]`; inside a shadow root the host plays that role. */
@@ -72,6 +80,8 @@ export class YomitanEntriesElement extends ElementBase {
     controller: DisplayController | null = null;
     /** Sentence and page details for Anki notes (for example the text box a lookup came from). */
     noteContext: AnkiNoteContext = {};
+    /** Media for `{screenshot}` in Anki notes (for example the crop of the page the lookup came from). */
+    noteMedia: NoteMedia | undefined = undefined;
     /** App-defined marker values for Anki notes (for example `{series}`). */
     extraMarkers: Record<string, string> | undefined = undefined;
     /** Theme inputs for Yomitan's `browser` and `site` themes. */
@@ -296,15 +306,16 @@ export class YomitanEntriesElement extends ElementBase {
         }
         button.disabled = true;
         try {
-            const { noteId, overwritten } = await controller.addNote(
+            const { noteId, overwritten, warnings } = await controller.addNote(
                 entry,
                 cardFormatIndex,
                 this.noteContext,
                 this.extraMarkers,
+                this.noteMedia,
             );
             this.dispatchEvent(
                 new CustomEvent<NoteAddedDetail>('note-added', {
-                    detail: { entryIndex, cardFormatIndex, noteId, overwritten },
+                    detail: { entryIndex, cardFormatIndex, noteId, overwritten, warnings },
                 }),
             );
         } catch (error) {

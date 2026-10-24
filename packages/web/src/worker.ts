@@ -55,6 +55,8 @@ const METHODS = new Set([
     'render.document',
     'render.css',
     'render.attributes',
+    'audio.urls',
+    'audio.sourceUrls',
     'anki.markers',
     'anki.defaultTemplates',
     'anki.buildNote',
@@ -316,6 +318,10 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
             css: remote('render.css'),
             attributes: (theme?: Parameters<Yomitan['render']['attributes']>[0]) =>
                 getDisplayAttributes(profile.options, theme),
+        },
+        audio: {
+            urls: remote('audio.urls'),
+            sourceUrls: remote('audio.sourceUrls'),
         },
         anki: {
             markers: remote('anki.markers'),

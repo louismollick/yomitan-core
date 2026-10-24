@@ -7,6 +7,7 @@
  */
 
 import { AnkiNotes, type BuildNoteOptions } from '../anki/anki';
+import { type AudioSourceUrls, type AudioUrl, createAudioUrlResolver } from '../audio/audio-urls';
 import type { StringElement } from '../dom/string-dom';
 import { type ArchiveEntry, type ArchiveReader, createZipArchiveReader } from '../import/archive';
 import type { ImageInfoReader } from '../import/image-info';
@@ -477,6 +478,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
     };
 
     const ankiNotes = new AnkiNotes();
+    const audioUrls = createAudioUrlResolver(fetchImpl);
     let stringRenderer: Promise<EntryRenderer<StringElement>> | null = null;
 
     const getMediaBytes = async (dictionary: string, path: string) => {
@@ -698,6 +700,29 @@ export async function createYomitan(options: CreateYomitanOptions) {
             /** The root `data-*` attributes (as `dataset` keys) the popup CSS keys off. */
             attributes(theme?: ThemeContext): Record<string, string> {
                 return getDisplayAttributes(profile.options, theme);
+            },
+        },
+
+        audio: {
+            /**
+             * Playable URLs for a term from the profile's audio sources, in source order (then the
+             * default sources, if `audio.enableDefaultAudioSources`). Nothing is downloaded, so a URL
+             * may still turn out to hold no audio. Sources that read a web page or API use the client's
+             * `fetch`, which needs CORS access in browsers; a source that fails or takes over 5 seconds
+             * contributes no URLs.
+             */
+            urls(term: string, reading: string): Promise<AudioUrl[]> {
+                assertUsable();
+                return audioUrls.all(profile.options, term, reading);
+            },
+            /**
+             * The URLs of one audio source (`index` into the profile's sources, then the default
+             * sources), and whether more sources follow. For trying sources one at a time, as Yomitan
+             * does when it downloads audio: later sources are only resolved if earlier ones fail.
+             */
+            sourceUrls(term: string, reading: string, index: number): Promise<AudioSourceUrls> {
+                assertUsable();
+                return audioUrls.source(profile.options, term, reading, index);
             },
         },
 

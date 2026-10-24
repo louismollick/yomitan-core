@@ -24,6 +24,7 @@ import {
 import { INVALID_NOTE_ID, isNoteDataValid } from '../upstream/ext/js/data/anki-util.js';
 import { AnkiTemplateRenderer } from '../upstream/ext/js/templates/anki-template-renderer.js';
 import type { DictionaryEntry } from '../upstream/types/ext/dictionary';
+import type { MediaRequirement, StoredNoteMedia } from './media';
 
 export type AnkiNote = {
     fields: Record<string, string>;
@@ -52,7 +53,16 @@ export interface AnkiTransport {
     canAddNotesWithErrorDetail?(notes: AnkiNote[]): Promise<{ canAdd: boolean; error: string | null }[]>;
     notesInfo?(noteIds: number[]): Promise<(AnkiNoteInfo | null)[]>;
     guiBrowseNotes?(noteIds: number[]): Promise<unknown>;
+    /**
+     * Puts a file in Anki's media folder and resolves to the name it was stored under, or `null` when
+     * it was skipped (`skipHash` matched). `url` has Anki itself download the file. Without this
+     * capability, media markers such as `{screenshot}` and `{audio}` render empty.
+     */
+    storeMediaFile?(fileName: string, source: AnkiMediaSource): Promise<string | null>;
 }
+
+/** Where `storeMediaFile` gets a file: base64 bytes, or a URL for Anki to download (`skipHash` is an MD5 to skip). */
+export type AnkiMediaSource = { data: string } | { url: string; skipHash?: string };
 
 export type AnkiConnectOptions = {
     server?: string;
@@ -69,6 +79,7 @@ type UpstreamAnkiConnect = AnkiTransport & {
     getDeckNames(): Promise<string[]>;
     getModelNames(): Promise<string[]>;
     getModelFieldNames(model: string): Promise<string[]>;
+    _checkVersion(): Promise<void>;
 };
 
 /** Yomitan's AnkiConnect client. Requests go through `options.fetch`, or the global `fetch`. */
@@ -85,6 +96,7 @@ export function createAnkiConnectTransport(options: AnkiConnectOptions = {}) {
     connection.apiKey = options.apiKey ?? null;
     connection.enabled = true;
     const transport: AnkiTransport & {
+        storeMediaFile: NonNullable<AnkiTransport['storeMediaFile']>;
         getDeckNames(): Promise<string[]>;
         getModelNames(): Promise<string[]>;
         getModelFieldNames(model: string): Promise<string[]>;
@@ -97,6 +109,15 @@ export function createAnkiConnectTransport(options: AnkiConnectOptions = {}) {
         findNoteIds: (notes) => connection.findNoteIds(notes),
         notesInfo: (ids) => (connection.notesInfo as NonNullable<AnkiTransport['notesInfo']>)(ids),
         guiBrowseNotes: (ids) => connection.guiBrowseNotes(ids),
+        // Upstream's client only sends `data`; AnkiConnect also takes `url` and `skipHash`.
+        storeMediaFile: async (fileName, source) => {
+            await connection._checkVersion();
+            const result = await connection._invoke('storeMediaFile', { filename: fileName, ...source });
+            if (result !== null && typeof result !== 'string') {
+                throw new Error('Unexpected result from AnkiConnect storeMediaFile');
+            }
+            return result;
+        },
         getDeckNames: () => connection.getDeckNames(),
         getModelNames: () => connection.getModelNames(),
         getModelFieldNames: (model) => connection.getModelFieldNames(model),
@@ -122,46 +143,77 @@ export type BuildNoteOptions = {
      * tags. Yomitan's own markers take precedence when names clash.
      */
     extraMarkers?: Record<string, string>;
+    /**
+     * Files already in Anki's media folder, which `{screenshot}`, `{audio}` and dictionary images in
+     * `{glossary}` refer to. Without it those markers render empty. `createDisplayController`
+     * produces it from the note's `requirements` when adding a note.
+     */
+    storedMedia?: StoredNoteMedia;
 };
 
-export type BuiltNote = { note: AnkiNote; errors: Error[] };
+export type BuiltNote = {
+    note: AnkiNote;
+    errors: Error[];
+    /** The media the card format's fields ask for and the build didn't have (see `storedMedia`). */
+    requirements: MediaRequirement[];
+};
 
 type NoteBuilder = {
-    createNote(details: Record<string, unknown>): Promise<{ note: AnkiNote; errors: Error[] }>;
+    createNote(details: Record<string, unknown>): Promise<BuiltNote>;
     getDictionaryStylesMap(dictionaries: ProfileOptions['dictionaries']): Map<string, string>;
 };
+
+/**
+ * `createNote` runs its media step when it has requirements and media options. The stored file names
+ * are resolved before the build, so any requirement triggers the step and the api just returns them.
+ */
+const STORED_MEDIA_REQUIREMENTS: MediaRequirement[] = [{ type: 'audio' }];
+const STORED_MEDIA_OPTIONS = { audio: null, screenshot: null, textParsing: null };
+
+function createStoredMediaApi(stored: StoredNoteMedia | undefined) {
+    return {
+        injectAnkiNoteMedia: async () => ({
+            audioFileName: stored?.audio ?? null,
+            screenshotFileName: stored?.screenshot ?? null,
+            clipboardImageFileName: null,
+            clipboardText: null,
+            dictionaryMedia: stored?.dictionaryMedia ?? [],
+            errors: [],
+        }),
+        parseText: async () => {
+            throw new Error('Text parsing requirements are not supported yet');
+        },
+    };
+}
 
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export class AnkiNotes {
-    private builder: Promise<NoteBuilder> | null = null;
+    private templateRenderer: Promise<unknown> | null = null;
     private defaultTemplates: Promise<string> | null = null;
 
-    private getBuilder(): Promise<NoteBuilder> {
-        this.builder ??= (async () => {
+    private getTemplateRenderer(): Promise<unknown> {
+        this.templateRenderer ??= (async () => {
             const document = new StringDocument();
             const Renderer = AnkiTemplateRenderer as unknown as new (
                 document: unknown,
                 window: unknown,
             ) => { prepare(): Promise<void>; templateRenderer: unknown };
-            const renderer = new Renderer(document, createStringWindow(document)) as unknown as {
-                prepare(): Promise<void>;
-                templateRenderer: unknown;
-            };
+            const renderer = new Renderer(document, createStringWindow(document));
             await renderer.prepare();
-            const api = {
-                injectAnkiNoteMedia: async () => {
-                    throw new Error('Anki media is not supported yet');
-                },
-                parseText: async () => {
-                    throw new Error('Text parsing requirements are not supported yet');
-                },
-            };
-            return new AnkiNoteBuilder(api, renderer.templateRenderer) as unknown as NoteBuilder;
+            return renderer.templateRenderer;
         })();
-        return this.builder;
+        return this.templateRenderer;
+    }
+
+    /** A builder is cheap; the prepared template renderer is shared. */
+    private async createBuilder(stored: StoredNoteMedia | undefined): Promise<NoteBuilder> {
+        return new AnkiNoteBuilder(
+            createStoredMediaApi(stored),
+            await this.getTemplateRenderer(),
+        ) as unknown as NoteBuilder;
     }
 
     /** Yomitan's default field templates (`default-anki-field-templates.handlebars`). */
@@ -189,7 +241,7 @@ export class AnkiNotes {
         entry: DictionaryEntry,
         options: ProfileOptions,
         dictionaryInfo: Summary[],
-        { cardFormatIndex = 0, context = {}, extraMarkers = {} }: BuildNoteOptions = {},
+        { cardFormatIndex = 0, context = {}, extraMarkers = {}, storedMedia }: BuildNoteOptions = {},
     ): Promise<BuiltNote> {
         const baseFormat = options.anki.cardFormats[cardFormatIndex];
         if (baseFormat === undefined) {
@@ -203,7 +255,7 @@ export class AnkiNotes {
             extraMarkers,
         );
         const source = this.getSource(entry);
-        const builder = await this.getBuilder();
+        const builder = await this.createBuilder(storedMedia);
         // Upstream sanitizes dictionary CSS with the browser's CSSOM before it reaches Anki fields.
         const dictionaryStylesMap =
             typeof (globalThis as { CSSStyleSheet?: unknown }).CSSStyleSheet === 'function'
@@ -217,7 +269,7 @@ export class AnkiNotes {
         for (const [name, css] of dictionaryStylesMap) {
             dictionaryStylesMap.set(name, escapeCssForStyleElement(css));
         }
-        const { note, errors } = await builder.createNote({
+        const { note, errors, requirements } = await builder.createNote({
             dictionaryEntry: entry,
             cardFormat,
             context: {
@@ -234,14 +286,14 @@ export class AnkiNotes {
             resultOutputMode: options.general.resultOutputMode,
             glossaryLayoutMode: options.general.glossaryLayoutMode,
             compactTags: options.general.compactTags,
-            mediaOptions: null,
-            requirements: [],
+            mediaOptions: storedMedia === undefined ? null : STORED_MEDIA_OPTIONS,
+            requirements: storedMedia === undefined ? [] : STORED_MEDIA_REQUIREMENTS,
             dictionaryStylesMap,
         });
         for (const [name, value] of Object.entries(note.fields)) {
             note.fields[name] = restoreBraces(value);
         }
-        return { note, errors };
+        return { note, errors, requirements };
     }
 
     private getSource(entry: DictionaryEntry): string {

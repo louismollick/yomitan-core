@@ -76,6 +76,7 @@ export type { DictionaryOptions, Profile, ProfileOptions } from './profile/profi
 export type { KanjiDictionaryEntry, TermDictionaryEntry } from './upstream/types/ext/dictionary';
 export {
     type AnkiConnectOptions,
+    type AnkiMediaSource,
     type AnkiNote,
     type AnkiNoteContext,
     type AnkiNoteInfo,
@@ -86,6 +87,8 @@ export {
     type FieldOverwriteMode,
     type NoteState,
 } from './anki/anki';
+export type { MediaRequirement, NoteMedia, StoredNoteMedia } from './anki/media';
+export type { AudioUrl } from './audio/audio-urls';
 export {
     type AddNoteResult,
     type CardFormatState,

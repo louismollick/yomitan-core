@@ -130,7 +130,7 @@ yomitan.render.html(entries, { styles: 'inline' | 'external', media: 'placeholde
 
 yomitan.anki.markers(type) / buildNote(entry, cardFormatIndex, { context, extraMarkers }) / renderFields(...)
     // extraMarkers: consumer-defined values, such as mokuro-reader's {series} and {volume}, resolved alongside Yomitan's markers
-yomitan.audio.sources(term, reading)    // URL resolution only; fetch and validation are on the roadmap
+yomitan.audio.urls(term, reading)       // URL resolution only; download and validation are on the roadmap
 
 yomitan.dispose()
 ```
@@ -221,7 +221,7 @@ The generated goldens are committed next to the copied fixtures, and the script 
 | `sentence`, `sentence-furigana`, `cloze-prefix` / `body` / `body-kana` / `suffix` | Generated goldens with a sentence context |
 | `pitch-accents`, `pitch-accent-graphs`, `pitch-accent-positions`, `pitch-accent-categories`, `phonetic-transcriptions` | Generated goldens (these were silently empty before) |
 | `frequencies`, `frequency-harmonic-rank` / `occurrence`, `frequency-average-*` | Upstream goldens |
-| `audio`, `screenshot`, `clipboard-image`, `clipboard-text`, dictionary media | **Deferred** to roadmap #1–2. They render empty exactly as upstream does when no media is supplied, and a test asserts that. |
+| `audio`, `screenshot`, `clipboard-image`, `clipboard-text`, dictionary media | Render empty exactly as upstream does when no media is supplied, and a test asserts that. `screenshot`, `audio` and dictionary media are filled when the display controller adds a note (roadmap #2, done); the clipboard ones stay empty. |
 
 **Upstream updates.** The pin moves only for user-facing changes (ADR-0001). Moving it means re-copying the fixtures, regenerating the snapshots, and porting whatever the new expected output requires.
 

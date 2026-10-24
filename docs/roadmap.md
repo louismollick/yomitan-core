@@ -23,6 +23,8 @@ The last section lists what is deliberately out of scope, so it is not re-propos
 
 ### 1. Audio download, validation and fallback (M)
 
+**Status: partly done.** `audio.urls(term, reading)` resolves the profile's audio sources to playable URLs, and Anki notes get `{audio}` through it (item 2). Playback, download and validation are still open.
+
 **What Yomitan does.** It resolves each configured audio source in order, then:
 - downloads the audio with an idle timeout;
 - rejects JapanesePod101's "invalid audio" placeholder by content hash;
@@ -31,31 +33,30 @@ The last section lists what is deliberately out of scope, so it is not re-propos
 
 This is in upstream `media/audio-downloader.js` and `display/display-audio.js`.
 
-**Where the library stands after the overhaul.** Audio source URL resolution is re-ported, and `fetch` and the HTML parser are injected. There is no download, validation or fallback, and no `play-audio` entry action. The default renderer hides the audio button until this lands (ADR-0008 amendment). The `{audio}` marker renders empty, as Yomitan does when no audio is supplied.
+**Done.**
+- `audio.urls(term, reading)` runs upstream's `AudioDownloader` for every source type: `jpod101`, `language-pod-101`, `jisho`, `lingua-libre`, `wiktionary`, `custom` and `custom-json`. It honours `enableDefaultAudioSources`. Sources that read a web page or API use the client's `fetch`, so browsers need CORS access (or a proxying `fetch`). `text-to-speech` sources have no URL and are skipped.
+- Each JapanesePod101 URL carries the MD5 of its placeholder clip as `skipHash`, which AnkiConnect's `storeMediaFile` uses to skip it.
 
-**Scope.**
-- `audio.fetch(term, reading)` walks the profile's audio sources and returns the first valid audio as bytes plus a MIME type, or a reason for each source that failed.
+**Still open.**
+- `audio.fetch(term, reading)`: walk the sources and return the first valid audio as bytes plus a MIME type, rejecting the placeholder by SHA-256 as upstream does, or a reason for each source that failed. Needs an idle timeout.
 - A cache keyed by source, term and reading.
-- The `play-audio` entry action and the audio-source menu in the display controller. Playback itself stays with the consumer, through an injected "play these bytes" hook with a default for web.
-- The `{audio}` marker is filled from the same result.
+- The `play-audio` entry action and the audio-source menu in the display controller. Playback itself stays with the consumer, through an injected "play these bytes" hook with a default for web. The default renderer hides the audio button until this lands (ADR-0008 amendment).
 
-**Who needs it.** mokuro-reader (its audio buttons are dead today) and substreamer (lyrics).
-
-**Depends on.** The display controller, from the overhaul. The `{audio}` marker also needs Anki media injection (item 2), so build item 2's media interface first or together with this.
+**Who needs it.** mokuro-reader (its audio buttons are dead today; it can already play `audio.urls` itself) and substreamer (lyrics).
 
 ### 2. Anki media injection (M)
 
+**Status: done for screenshot, audio and dictionary images.** Still open: clipboard image and text, popup selection text and `{sentence-furigana}` text parsing.
+
 **What Yomitan does.** It attaches media to notes: term audio, a screenshot, a clipboard image, clipboard text, dictionary images referenced by the glossary, and pitch-accent graph images. Media files get content-hashed names (upstream #2370).
 
-**Where the library stands after the overhaul.** Note fields are rendered with markers. Media markers (`{audio}`, `{screenshot}`, `{clipboard-image}`, dictionary images in `{glossary}`) render empty, or render references with no stored file.
+**Done.**
+- `AnkiTransport.storeMediaFile` (optional capability), implemented by `createAnkiConnectTransport` with AnkiConnect's `data`, `url` and `skipHash`. Without it, media markers render empty.
+- `buildNote` returns the `requirements` a card format's fields ask for and takes `storedMedia` to build with. `createDisplayController(...).addNote(entry, index, context, extraMarkers, media)` runs the whole flow, as upstream's `_injectMedia` does.
+- `{screenshot}` comes from the host's `media.screenshot` bytes. `{audio}` is downloaded by Anki itself from the first working `audio.urls` entry. Glossary images are read from storage and stored as base64.
+- File names follow upstream: `yomitan_browser_screenshot_<timestamp>_<random>`, `yomitan_dictionary_media_<sha1>` (timestamp where SHA-1 or `Uint8Array.fromBase64` is missing) and `yomitan_audio_<timestamp>_<random>`; the random part keeps same-millisecond saves apart. Audio is named by timestamp because Anki downloads it, so the library never sees the bytes to hash.
 
-**Scope.**
-- A media interface on `anki.addNote`: the consumer supplies bytes for screenshot and clipboard image, and the library stores the files through the Anki transport (`storeMediaFile`).
-- The library supplies audio (item 1) and dictionary media, taken from storage.
-- Hashed file names, as Yomitan names them.
-- `{glossary}` images reference the stored file names through the HTML renderer's `media: 'anki'` mode (Yomitan's hashed file names), which the overhaul already provides.
-
-**Who needs it.** mokuro-reader. It could attach the manga panel crop as the screenshot, replacing its separate non-Yomitan Anki flow.
+**Who needs it.** mokuro-reader. It attaches the manga panel crop as the screenshot, replacing its separate non-Yomitan Anki flow.
 
 ### 3. DOM text scanner for the web (L)
 
