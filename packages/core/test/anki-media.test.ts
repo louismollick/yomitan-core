@@ -3,8 +3,11 @@
  * Storing media for notes end to end is covered by the render-anki contract.
  */
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+import type { AnkiNote, AnkiTransport } from '../src/anki/anki';
 import { createAnkiConnectTransport } from '../src/anki/anki';
+import { storeNoteMedia } from '../src/anki/media';
+import { createAudioUrlResolver } from '../src/audio/audio-urls';
 import { createYomitan } from '../src/client/yomitan';
 import { createMemoryStorage } from '../src/storage/memory-storage';
 
@@ -141,5 +144,113 @@ describe('AnkiConnect storeMediaFile', () => {
         const { fetch } = mockAnkiConnect(null);
         const anki = createAnkiConnectTransport({ fetch });
         expect(await anki.storeMediaFile('a.mp3', { url: 'https://audio.test/a.mp3', skipHash: 'x' })).toBeNull();
+    });
+});
+
+describe('audio source timeouts', () => {
+    const stalled = (() => new Promise(() => {})) as never;
+    const profile = async (sources: AudioSources) => (await createClient(sources)).profile.get().options;
+
+    test('a stalled fetching source does not hold up a direct URL', async () => {
+        const resolver = createAudioUrlResolver(stalled, 30);
+        const options = await profile([
+            { type: 'custom-json', url: 'https://list.test/?q={term}' },
+            { type: 'jpod101' },
+        ]);
+        const urls = await resolver.all(options, '猫', 'ねこ');
+        expect(urls.map(({ source }) => source)).toEqual(['jpod101']);
+        // Resolving by source leaves the stalled one out of the way until it is asked for.
+        const second = await resolver.source(options, '猫', 'ねこ', 1);
+        expect(second.more).toBe(false);
+        expect(second.urls.map(({ source }) => source)).toEqual(['jpod101']);
+        const first = await resolver.source(options, '猫', 'ねこ', 0);
+        expect(first).toEqual({ urls: [], more: true });
+    });
+});
+
+describe('storing note media', () => {
+    const entry = { type: 'term', headwords: [{ term: '猫', reading: 'ねこ', sources: [] }] } as never;
+
+    function fakeTransport(failUrls: (url: string) => 'error' | 'skip' | 'ok') {
+        const stored: { fileName: string; source: unknown }[] = [];
+        const anki = {
+            storeMediaFile: async (fileName: string, source: { data: string } | { url: string }) => {
+                stored.push({ fileName, source });
+                const outcome = 'url' in source ? failUrls(source.url) : 'ok';
+                if (outcome === 'error') throw new Error(`download failed: ${'url' in source ? source.url : ''}`);
+                return outcome === 'skip' ? null : fileName;
+            },
+        } as unknown as AnkiTransport;
+        return { anki, stored };
+    }
+
+    const sourceList = (sources: { url: string; skipHash?: string }[][]) => {
+        const calls: number[] = [];
+        return {
+            calls,
+            client: {
+                audio: {
+                    sourceUrls: async (_term: string, _reading: string, index: number) => {
+                        calls.push(index);
+                        return {
+                            urls: (sources[index] ?? []).map((item) => ({ ...item, source: 'custom' as const })),
+                            more: index + 1 < sources.length,
+                        };
+                    },
+                },
+                dictionaries: { getMedia: async () => null },
+            },
+        };
+    };
+
+    test('names never collide for saves in the same millisecond', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+        const { anki, stored } = fakeTransport(() => 'ok');
+        const { client } = sourceList([[{ url: 'https://audio.test/a.mp3' }]]);
+        const media = { screenshot: { data: new Uint8Array([1]), mediaType: 'image/jpeg' } };
+        const requirements = [{ type: 'audio' }, { type: 'screenshot' }] as never;
+        await storeNoteMedia(anki, client, entry, requirements, media);
+        await storeNoteMedia(anki, client, entry, requirements, media);
+        vi.restoreAllMocks();
+        const names = stored.map(({ fileName }) => fileName);
+        expect(names).toHaveLength(4);
+        expect(new Set(names).size).toBe(4);
+        expect(names.filter((name) => name.startsWith('yomitan_audio_'))).toHaveLength(2);
+        expect(names.filter((name) => name.startsWith('yomitan_browser_screenshot_'))).toHaveLength(2);
+    });
+
+    test('tries sources in order and only resolves the next one when needed', async () => {
+        const { anki } = fakeTransport(() => 'ok');
+        const ready = sourceList([[{ url: 'https://audio.test/a.mp3' }], [{ url: 'https://audio.test/b.mp3' }]]);
+        const result = await storeNoteMedia(anki, ready.client, entry, [{ type: 'audio' }] as never);
+        expect(result.stored?.audio).toBeDefined();
+        expect(ready.calls).toEqual([0]);
+
+        const { anki: second, stored } = fakeTransport((url) => (url.endsWith('a.mp3') ? 'skip' : 'ok'));
+        const fallback = sourceList([[{ url: 'https://audio.test/a.mp3' }], [{ url: 'https://audio.test/b.mp3' }]]);
+        await storeNoteMedia(second, fallback.client, entry, [{ type: 'audio' }] as never);
+        expect(fallback.calls).toEqual([0, 1]);
+        expect(stored).toHaveLength(2);
+    });
+
+    test('warns when every audio candidate fails, but not for placeholder clips or no sources', async () => {
+        const failing = fakeTransport(() => 'error');
+        const two = sourceList([[{ url: 'https://audio.test/a.mp3' }], [{ url: 'https://audio.test/b.mp3' }]]);
+        const failed = await storeNoteMedia(failing.anki, two.client, entry, [{ type: 'audio' }] as never);
+        expect(failed.stored).toBeNull();
+        expect(failed.warnings).toEqual(['Could not store audio: download failed: https://audio.test/a.mp3']);
+
+        const placeholder = fakeTransport(() => 'skip');
+        const skipped = await storeNoteMedia(placeholder.anki, two.client, entry, [{ type: 'audio' }] as never);
+        expect(skipped).toEqual({ stored: null, warnings: [] });
+
+        const none = await storeNoteMedia(placeholder.anki, sourceList([]).client, entry, [{ type: 'audio' }] as never);
+        expect(none).toEqual({ stored: null, warnings: [] });
+
+        // An error before a success is not reported: the note got its audio.
+        const mixed = fakeTransport((url) => (url.endsWith('a.mp3') ? 'error' : 'ok'));
+        const recovered = await storeNoteMedia(mixed.anki, two.client, entry, [{ type: 'audio' }] as never);
+        expect(recovered.stored?.audio).toBeDefined();
+        expect(recovered.warnings).toEqual([]);
     });
 });

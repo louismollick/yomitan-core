@@ -19,12 +19,14 @@ const { noteId, warnings } = await controller.addNote(entry, cardFormatIndex, co
 | Marker | Comes from |
 | --- | --- |
 | `{screenshot}` | The `media.screenshot` bytes, sent to Anki as base64. |
-| `{audio}` | The profile's `audio.sources`. Anki downloads the first working URL itself (`storeMediaFile` with `url`), so no audio passes through the device. JapanesePod101's "no audio" clip is skipped by its MD5. |
+| `{audio}` | The profile's `audio.sources`. Anki downloads the first working URL itself (`storeMediaFile` with `url`), so no audio passes through the device. Sources are resolved one at a time in profile order, so a slow later source never delays an earlier one. JapanesePod101's "no audio" clip is skipped by its MD5. |
 | Images in `{glossary}` | The dictionary's media in storage, sent as base64. |
 
-A file that can't be stored becomes a `warnings` entry and its marker renders empty; the note is still added. Without `storeMediaFile`, or when `media` has no screenshot, `{screenshot}` renders empty. `{clipboard-image}`, `{clipboard-text}` and `{popup-selection-text}` are not supported.
+A file that can't be stored becomes a `warnings` entry and its marker renders empty; the note is still added. A term with no audio (every source empty or only placeholder clips) is not a warning, but audio that failed with errors is. File names are `yomitan_<type>_<timestamp>_<random>` so saves in the same millisecond never overwrite each other. Without `storeMediaFile`, or when `media` has no screenshot, `{screenshot}` renders empty. `{clipboard-image}`, `{clipboard-text}` and `{popup-selection-text}` are not supported.
 
-`yomitan.audio.urls(term, reading)` returns the playable URLs for the profile's audio sources, in order: `{ url, source, name?, skipHash? }[]`. Sources that read a web page or API (Jisho, LanguagePod101, Wikimedia, `custom-json`) use the client's `fetch`, which needs CORS access in browsers. Nothing is downloaded or validated, so a URL can still turn out to hold no audio.
+`yomitan.audio.urls(term, reading)` returns the playable URLs for the profile's audio sources, in order: `{ url, source, name?, skipHash? }[]`. Sources that read a web page or API (Jisho, LanguagePod101, Wikimedia, `custom-json`) use the client's `fetch`, which needs CORS access in browsers; each is cut off after 5 seconds and contributes no URLs. `audio.sourceUrls(term, reading, index)` returns one source's URLs and whether more follow. Nothing is downloaded or validated, so a URL can still turn out to hold no audio.
+
+Like Yomitan, duplicate detection checks the note built without media, so a media marker in the first field is not seen by it.
 
 Outside the display controller, call `buildNote` for the note and its `requirements`, store files yourself, and call `buildNote` again with `storedMedia`.
 

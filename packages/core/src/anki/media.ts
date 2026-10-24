@@ -9,7 +9,7 @@
  * consumer side, where the Anki transport is.
  */
 
-import type { AudioUrl } from '../audio/audio-urls';
+import type { AudioSourceUrls } from '../audio/audio-urls';
 import { type BlobLike, isBlobLike } from '../platform/types';
 import { AnkiNoteBuilder } from '../upstream/ext/js/data/anki-note-builder.js';
 import { generateAnkiNoteMediaFileName, mediaFileNameHashOrTimestamp } from '../upstream/ext/js/data/anki-util.js';
@@ -40,7 +40,7 @@ export type StoredNoteMedia = {
 
 /** What storing media needs from a yomitan-core client. */
 export type MediaClient = {
-    audio: { urls(term: string, reading: string): Promise<AudioUrl[]> };
+    audio: { sourceUrls(term: string, reading: string, index: number): Promise<AudioSourceUrls> };
     dictionaries: {
         getMedia(dictionary: string, path: string): Promise<{ mediaType: string; content: Uint8Array } | null>;
     };
@@ -67,6 +67,18 @@ function audioExtension(url: string): string {
     }
 }
 
+/**
+ * Upstream's `yomitan_<type>_<timestamp>` name plus a random part, so two saves in the same
+ * millisecond (AnkiConnect overwrites a file of the same name) never share a file.
+ */
+function uniqueFileName(prefix: string, extension: string, timestamp: number): string {
+    const random =
+        typeof globalThis.crypto?.randomUUID === 'function'
+            ? globalThis.crypto.randomUUID().slice(0, 8)
+            : Math.random().toString(16).slice(2, 10).padEnd(8, '0');
+    return `${generateAnkiNoteMediaFileName(prefix, '', timestamp) as string}_${random}${extension}`;
+}
+
 const entryDetailsBuilder = new (
     AnkiNoteBuilder as unknown as new (
         api: object,
@@ -83,7 +95,7 @@ const entryDetailsBuilder = new (
  * The screenshot is the host's image; dictionary images come from storage; audio is downloaded by
  * Anki itself from the first of `audio.urls` that works, so nothing large passes through the
  * device. Failures are returned as `warnings`, and the matching marker renders empty (a term
- * without audio is not a warning, as in Yomitan). `stored` is null when there is nothing to build with.
+ * with no audio, or only placeholder clips, is not a warning, as in Yomitan). `stored` is null when there is nothing to build with.
  */
 export async function storeNoteMedia(
     anki: AnkiTransport,
@@ -123,11 +135,7 @@ export async function storeNoteMedia(
                 const bytes = isBlobLike(screenshot.data)
                     ? new Uint8Array(await screenshot.data.arrayBuffer())
                     : screenshot.data;
-                const name = generateAnkiNoteMediaFileName(
-                    'yomitan_browser_screenshot',
-                    extension,
-                    timestamp,
-                ) as string;
+                const name = uniqueFileName('yomitan_browser_screenshot', extension, timestamp);
                 stored.screenshot = (await store(name, { data: toBase64(bytes) })) ?? undefined;
             }),
         );
@@ -135,20 +143,27 @@ export async function storeNoteMedia(
     if (wants('audio') && target.type === 'term') {
         tasks.push(
             attempt(async () => {
-                for (const { url, skipHash } of await client.audio.urls(target.term, target.reading)) {
-                    const name = (
-                        generateAnkiNoteMediaFileName('yomitan_audio', audioExtension(url), timestamp) as string
-                    ).replace(/\]/g, '');
-                    try {
-                        // Anki downloads the file; a miss or a placeholder clip moves on to the next source.
-                        const fileName = await store(name, skipHash === undefined ? { url } : { url, skipHash });
-                        if (fileName !== null) {
-                            stored.audio = fileName;
-                            return;
+                // Sources are resolved one at a time, so a slow later source never delays a ready earlier one.
+                const failures: string[] = [];
+                for (let index = 0, more = true; more; ++index) {
+                    const { urls, more: hasMore } = await client.audio.sourceUrls(target.term, target.reading, index);
+                    more = hasMore;
+                    for (const { url, skipHash } of urls) {
+                        const name = uniqueFileName('yomitan_audio', audioExtension(url), timestamp).replace(/\]/g, '');
+                        try {
+                            // Anki downloads the file. `null` means it was the placeholder clip: a miss, not an error.
+                            const fileName = await store(name, skipHash === undefined ? { url } : { url, skipHash });
+                            if (fileName !== null) {
+                                stored.audio = fileName;
+                                return;
+                            }
+                        } catch (error) {
+                            failures.push(error instanceof Error ? error.message : String(error));
                         }
-                    } catch {
-                        // Try the next URL.
                     }
+                }
+                if (failures.length > 0) {
+                    warnings.push(`Could not store audio: ${failures[0]}`);
                 }
             }),
         );

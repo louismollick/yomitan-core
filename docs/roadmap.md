@@ -54,7 +54,7 @@ This is in upstream `media/audio-downloader.js` and `display/display-audio.js`.
 - `AnkiTransport.storeMediaFile` (optional capability), implemented by `createAnkiConnectTransport` with AnkiConnect's `data`, `url` and `skipHash`. Without it, media markers render empty.
 - `buildNote` returns the `requirements` a card format's fields ask for and takes `storedMedia` to build with. `createDisplayController(...).addNote(entry, index, context, extraMarkers, media)` runs the whole flow, as upstream's `_injectMedia` does.
 - `{screenshot}` comes from the host's `media.screenshot` bytes. `{audio}` is downloaded by Anki itself from the first working `audio.urls` entry. Glossary images are read from storage and stored as base64.
-- File names follow upstream: `yomitan_browser_screenshot_<timestamp>`, `yomitan_dictionary_media_<sha1>` (timestamp where SHA-1 or `Uint8Array.fromBase64` is missing) and `yomitan_audio_<timestamp>`. Audio is named by timestamp because Anki downloads it, so the library never sees the bytes to hash.
+- File names follow upstream: `yomitan_browser_screenshot_<timestamp>_<random>`, `yomitan_dictionary_media_<sha1>` (timestamp where SHA-1 or `Uint8Array.fromBase64` is missing) and `yomitan_audio_<timestamp>_<random>`; the random part keeps same-millisecond saves apart. Audio is named by timestamp because Anki downloads it, so the library never sees the bytes to hash.
 
 **Who needs it.** mokuro-reader. It attaches the manga panel crop as the screenshot, replacing its separate non-Yomitan Anki flow.
 
