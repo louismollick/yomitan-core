@@ -18,9 +18,10 @@ import type { SqlDriver, SqlValue } from './driver';
 
 /**
  * Bump when the schema changes. A database written by a newer schema is refused rather than
- * misread; older schemas are migrated by `MIGRATIONS`.
+ * misread; older schemas are migrated on open (see `open`).
+ * - 2: adds the `kanjiTerms` table (kanji-term index).
  */
-export const SQL_SCHEMA_VERSION = 1;
+export const SQL_SCHEMA_VERSION = 2;
 
 type StoreSchema = { columns: string[]; blob?: string };
 
@@ -33,6 +34,7 @@ const STORES: Record<ObjectStoreName, StoreSchema> = {
     kanjiMeta: { columns: ['dictionary', 'character'] },
     tagMeta: { columns: ['dictionary', 'name'] },
     media: { columns: ['dictionary', 'path'], blob: 'content' },
+    kanjiTerms: { columns: ['dictionary', 'character'] },
 };
 
 const STORE_NAMES = Object.keys(STORES) as ObjectStoreName[];
@@ -145,6 +147,13 @@ export class SqlBackend implements StorageBackend {
                     throw new Error(
                         `Dictionary database schema version ${version} is newer than this yomitan-core supports (${SQL_SCHEMA_VERSION})`,
                     );
+                }
+                if (version < SQL_SCHEMA_VERSION) {
+                    // Every migration so far only adds tables, which the schema SQL above created.
+                    // A dictionary imported before `kanjiTerms` existed has no index rows; it is built on demand.
+                    await this.driver.run("UPDATE yomitan_meta SET value = ? WHERE key = 'schemaVersion'", [
+                        String(SQL_SCHEMA_VERSION),
+                    ]);
                 }
             } catch (error) {
                 await this.driver.close().catch(() => {});

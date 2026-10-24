@@ -47,6 +47,7 @@ const METHODS = new Set([
     'dictionaries.getMedia',
     'lookup.terms',
     'lookup.kanji',
+    'lookup.termsContaining',
     'lookup.scan',
     'lookup.parse',
     'lookup.segment',
@@ -307,6 +308,7 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
         lookup: {
             terms: remote('lookup.terms'),
             kanji: remote('lookup.kanji'),
+            termsContaining: remote('lookup.termsContaining'),
             scan: remote('lookup.scan'),
             parse: remote('lookup.parse'),
             segment: remote('lookup.segment'),

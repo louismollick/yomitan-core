@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, test } from 'vitest';
 import {
+    SQL_SCHEMA_VERSION,
     SessionLostError,
     StorageBusyError,
     createFilesArchiveReader,
@@ -30,6 +31,42 @@ async function importFixture(storage: ReturnType<typeof createNodeStorage>) {
 }
 
 describe('SQLite storage', () => {
+    test('migrates a version 1 database: adds the kanjiTerms table and keeps its data', async () => {
+        const path = tempPath();
+        const storage = createNodeStorage(path);
+        await storage.prepare();
+        await importFixture(storage);
+        await storage.close();
+        // Make it look like the previous release wrote it.
+        const database = new Database(path);
+        database.exec('DROP TABLE "kanjiTerms"');
+        database.exec("UPDATE yomitan_meta SET value = '1' WHERE key = 'schemaVersion'");
+        database.close();
+
+        const upgraded = createNodeStorage(path);
+        await upgraded.prepare();
+        const rows = await upgraded.sql.driver.all<{ value: string }>(
+            "SELECT value FROM yomitan_meta WHERE key = 'schemaVersion'",
+        );
+        expect(rows[0].value).toBe(String(SQL_SCHEMA_VERSION));
+        expect(await upgraded.findKanjiTerms('打', TITLE)).toBeNull();
+        expect((await upgraded.findTermsBulk(['打ち込む'], new Set([TITLE]), 'exact')).length).toBeGreaterThan(0);
+        await upgraded.buildKanjiTermIndex(TITLE, undefined);
+        expect((await upgraded.findKanjiTerms('打', TITLE))?.length).toBe(3);
+        await upgraded.close();
+    });
+
+    test('refuses a database written by a newer schema', async () => {
+        const path = tempPath();
+        const storage = createNodeStorage(path);
+        await storage.prepare();
+        await storage.close();
+        const database = new Database(path);
+        database.exec(`UPDATE yomitan_meta SET value = '${SQL_SCHEMA_VERSION + 1}' WHERE key = 'schemaVersion'`);
+        database.close();
+        await expect(createNodeStorage(path).prepare()).rejects.toThrow('newer than this yomitan-core supports');
+    });
+
     test('takes the write lock before the transaction callback, and rolls back failed writes', async () => {
         const path = tempPath();
         const storage = createNodeStorage(path);

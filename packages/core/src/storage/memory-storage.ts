@@ -13,7 +13,16 @@ type Store = {
     indexes: Map<string, Map<unknown, number[]>>;
 };
 
-const STORE_NAMES: ObjectStoreName[] = ['dictionaries', 'terms', 'termMeta', 'kanji', 'kanjiMeta', 'tagMeta', 'media'];
+const STORE_NAMES: ObjectStoreName[] = [
+    'dictionaries',
+    'terms',
+    'termMeta',
+    'kanji',
+    'kanjiMeta',
+    'tagMeta',
+    'media',
+    'kanjiTerms',
+];
 
 /** IndexedDB copies values on write and read; callers may mutate what they get back. */
 function cloneValue<T>(value: T): T {

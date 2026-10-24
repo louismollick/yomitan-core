@@ -5,10 +5,12 @@
 
 import type * as DDB from '../upstream/types/ext/dictionary-database';
 import type { Summary } from '../upstream/types/ext/dictionary-importer';
+import type { KanjiTerm } from './kanji-term-index';
 
 export type { DDB, Summary };
 
-export type ObjectStoreName = DDB.ObjectStoreName;
+/** Yomitan's object stores plus `kanjiTerms`, the derived kanji-term index (see kanji-term-index.ts). */
+export type ObjectStoreName = DDB.ObjectStoreName | 'kanjiTerms';
 
 /**
  * The dictionary storage interface. It is Yomitan's own `DictionaryDatabase` interface, because the
@@ -45,6 +47,16 @@ export interface DictionaryStorage {
         start: number,
         count: number,
     ): Promise<void>;
+    /**
+     * The most frequent terms containing `character` in a frequency dictionary, best first, from the
+     * kanji-term index. `null` when the index of `dictionary` has not been built.
+     */
+    findKanjiTerms(character: string, dictionary: string): Promise<KanjiTerm[] | null>;
+    /**
+     * Builds (or rebuilds) the kanji-term index of `dictionary` from its term `freq` meta. This scans all
+     * of the dictionary's term meta: seconds for the largest frequency dictionaries.
+     */
+    buildKanjiTermIndex(dictionary: string, frequencyMode: Summary['frequencyMode']): Promise<void>;
 }
 
 /**

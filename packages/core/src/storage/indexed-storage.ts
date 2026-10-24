@@ -7,6 +7,7 @@
  * non-IndexedDB adapter returns exactly what upstream's IndexedDB class returns, in the same order.
  */
 
+import { type KanjiTerm, buildKanjiTermRows } from './kanji-term-index';
 import type {
     DDB,
     DictionarySet,
@@ -20,6 +21,9 @@ import type {
 } from './types';
 
 const DICTIONARY_STORES: ObjectStoreName[] = ['kanji', 'kanjiMeta', 'terms', 'termMeta', 'tagMeta', 'media'];
+
+/** Everything deleted with a dictionary: its data stores, plus the derived kanji-term index. */
+const DELETED_WITH_DICTIONARY: ObjectStoreName[] = [...DICTIONARY_STORES, 'kanjiTerms'];
 
 type FindMultiBulkData<TItem> = { item: TItem; itemIndex: number; indexIndex: number };
 
@@ -136,7 +140,7 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
         this.assertOpen();
         const targets: [ObjectStoreName, string][] = [
             ['dictionaries', 'title'],
-            ...DICTIONARY_STORES.map((store): [ObjectStoreName, string] => [store, 'dictionary']),
+            ...DELETED_WITH_DICTIONARY.map((store): [ObjectStoreName, string] => [store, 'dictionary']),
         ];
         const progressData: DDB.DeleteDictionaryProgressData = {
             count: 0,
@@ -381,6 +385,33 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
                 this.writeGuard,
             );
         }
+    }
+
+    async findKanjiTerms(character: string, dictionary: string): Promise<KanjiTerm[] | null> {
+        this.assertOpen();
+        // The row with an empty character marks the dictionary as indexed, even if it has no kanji terms.
+        const [marker, rows] = await Promise.all([
+            this.backend.getAll('kanjiTerms', 'character', { kind: 'only', value: '' }),
+            this.backend.getAll('kanjiTerms', 'character', { kind: 'only', value: character }),
+        ]);
+        if (!marker.some(({ value }) => value.dictionary === dictionary)) {
+            return null;
+        }
+        const row = rows.find(({ value }) => value.dictionary === dictionary);
+        return row === undefined ? [] : (row.value.terms as KanjiTerm[]);
+    }
+
+    async buildKanjiTermIndex(dictionary: string, frequencyMode: Summary['frequencyMode']): Promise<void> {
+        this.assertOpen();
+        const termMeta = await this.backend.getAll('termMeta', 'dictionary', { kind: 'only', value: dictionary });
+        const rows = buildKanjiTermRows(
+            dictionary,
+            termMeta.map(({ value }) => value),
+            frequencyMode,
+        );
+        // The marker row is last and written with the rest, so a half-built index is never trusted.
+        await this.backend.deleteWhere('kanjiTerms', 'dictionary', dictionary, this.writeGuard);
+        await this.backend.add('kanjiTerms', rows as unknown as Record<string, unknown>[], this.writeGuard);
     }
 
     private assertOpen(): void {

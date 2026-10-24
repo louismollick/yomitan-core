@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * IndexedDB storage with Yomitan's own database schema (ADR-0006; stores and indices from
- * ext/js/dictionary/dictionary-database.js at version 60). Query semantics come from the shared
- * IndexedDictionaryStorage, like every other adapter.
+ * ext/js/dictionary/dictionary-database.js at version 60, plus the derived `kanjiTerms` store). Query
+ * semantics come from the shared IndexedDictionaryStorage, like every other adapter.
  */
 
 import {
@@ -20,8 +20,12 @@ import { createWebLockSessions } from './web-lock-sessions';
 
 type ObjectStoreName = Parameters<StorageBackend['getAll']>[0];
 
-/** Yomitan's database version and final structure. */
-export const YOMITAN_DATABASE_VERSION = 60;
+/**
+ * Yomitan's database version (60) plus one for the `kanjiTerms` store, which Yomitan doesn't have.
+ * Opening an older database creates the missing store and indices in `onupgradeneeded`; existing
+ * data is untouched.
+ */
+export const YOMITAN_DATABASE_VERSION = 61;
 
 const STRUCTURE: Record<ObjectStoreName, { keyPath: string | null; indices: string[] }> = {
     terms: {
@@ -34,6 +38,7 @@ const STRUCTURE: Record<ObjectStoreName, { keyPath: string | null; indices: stri
     termMeta: { keyPath: null, indices: ['dictionary', 'expression'] },
     kanjiMeta: { keyPath: null, indices: ['dictionary', 'character'] },
     media: { keyPath: 'id', indices: ['dictionary', 'path'] },
+    kanjiTerms: { keyPath: null, indices: ['dictionary', 'character'] },
 };
 
 const STORE_NAMES = Object.keys(STRUCTURE) as ObjectStoreName[];
