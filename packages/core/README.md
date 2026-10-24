@@ -30,6 +30,28 @@ Like Yomitan, duplicate detection checks the note built without media, so a medi
 
 Outside the display controller, call `buildNote` for the note and its `requirements`, store files yourself, and call `buildNote` again with `storedMedia`.
 
+## Host-rendered results
+
+A consumer that draws its own entry UI can keep Yomitan's exact glossary formatting and add a Kanji View.
+
+```ts
+const { entries } = await yomitan.lookup.terms('入学式');
+
+// One block per dictionary, in the entry's dictionary order: Yomitan's definition list for that
+// dictionary (structured content, images, definition tags). `media` works as in `render.html`.
+const blocks = await yomitan.render.glossaries(entries[0], { media: { urlTemplate: 'app://media/{dictionary}/{path}' } });
+// [{ dictionary: 'Jitendex', dictionaryAlias: 'Jitendex', html: '<ol class="definition-list" ...>' }]
+
+// Style blocks with `render.css()`, scoped under an element carrying `render.attributes()`.
+// With `media: 'placeholder'`, `findGlossImages` and `setGlossImageSource` fill the images.
+
+// The most frequent terms containing a kanji, anywhere in the term (入学式 for 学), best first.
+const terms = await yomitan.lookup.termsContaining('学', { limit: 30, dictionary: 'Jiten' });
+// [{ term: '学校', reading: 'がっこう', frequency: 666, displayValue: '666' }, ...]
+```
+
+`termsContaining` reads a per-dictionary index of each kanji's 50 most frequent terms. The index is built when a dictionary with term frequencies is imported (a scan of its term frequencies: 0.6 s for JPDB, 3 s for the full Jiten and BCCWJ on Node with SQLite), stored with the dictionary and deleted with it. A dictionary imported by an earlier version is indexed on the first call instead: one scan of its term frequencies in bounded batches (peak memory about 280 MiB on Node for a 1M-row dictionary, mostly the runtime and SQLite), then stored. That build takes the write session that imports and deletes use, so the call rejects with `StorageBusyError` while one runs, and it indexes whatever dictionary of that title is installed once it holds the session. `dictionary` is a frequency dictionary's title; by default the profile's sort frequency dictionary if it is enabled and has term frequencies, else the first enabled dictionary that has them. An explicit `dictionary` must be installed with term frequencies, enabled or not. Each term appears once, at its best frequency. Frequencies marked ㋕ in `displayValue` (JPDB and Jiten use it for words written in kana) are ignored, and 々 is not a kanji. For `rank-based` dictionaries (the default) `frequency` is the rank and lower is more frequent; for `occurrence-based` dictionaries it is the count and higher is more frequent. `reading` comes from the frequency data, else from the enabled term dictionaries.
+
 ## License
 
 GPL-3.0-or-later. Contains code from Yomitan; see `src/upstream/PROVENANCE.md` in the repository.

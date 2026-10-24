@@ -18,6 +18,7 @@ import { createFilesArchiveReader } from '../../core/src/import/archive';
 import type { YomitanStorage } from '../../core/src/storage/types';
 import { createDictionaryArchive, zipFiles } from './fixtures';
 import { readFixtureDictionaryFiles } from './import-contract';
+import { runTermsContainingContract } from './terms-containing-contract';
 
 export type CreateClientStorage = () => Promise<YomitanStorage> | YomitanStorage;
 
@@ -617,4 +618,6 @@ export function runClientContract(
             await restored.dispose();
         });
     });
+
+    runTermsContainingContract(label, createStorage, makeClient);
 }

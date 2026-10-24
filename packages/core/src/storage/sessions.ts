@@ -10,10 +10,10 @@
 import type { DictionaryStorage, WriteGuard } from './types';
 
 /**
- * What a session was doing. Kinds are informational: recovery keeps an intact dictionary regardless
+ * What a session was doing (`index` is a lazy kanji-term index build). Kinds are informational: recovery keeps an intact dictionary regardless
  * of kind, and removes everything under the title when no intact summary exists.
  */
-export type WriteKind = 'import' | 'replace' | 'delete';
+export type WriteKind = 'import' | 'replace' | 'delete' | 'index';
 
 export type WriteSessionRecord = {
     id: string;

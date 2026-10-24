@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * IndexedDB storage with Yomitan's own database schema (ADR-0006; stores and indices from
- * ext/js/dictionary/dictionary-database.js at version 60). Query semantics come from the shared
- * IndexedDictionaryStorage, like every other adapter.
+ * ext/js/dictionary/dictionary-database.js at version 60, plus the derived `kanjiTerms` store). Query
+ * semantics come from the shared IndexedDictionaryStorage, like every other adapter.
  */
 
 import {
@@ -20,8 +20,12 @@ import { createWebLockSessions } from './web-lock-sessions';
 
 type ObjectStoreName = Parameters<StorageBackend['getAll']>[0];
 
-/** Yomitan's database version and final structure. */
-export const YOMITAN_DATABASE_VERSION = 60;
+/**
+ * Yomitan's database version (60) plus one for the `kanjiTerms` store, which Yomitan doesn't have.
+ * Opening an older database creates the missing store and indices in `onupgradeneeded`; existing
+ * data is untouched.
+ */
+export const YOMITAN_DATABASE_VERSION = 61;
 
 const STRUCTURE: Record<ObjectStoreName, { keyPath: string | null; indices: string[] }> = {
     terms: {
@@ -34,6 +38,7 @@ const STRUCTURE: Record<ObjectStoreName, { keyPath: string | null; indices: stri
     termMeta: { keyPath: null, indices: ['dictionary', 'expression'] },
     kanjiMeta: { keyPath: null, indices: ['dictionary', 'character'] },
     media: { keyPath: 'id', indices: ['dictionary', 'path'] },
+    kanjiTerms: { keyPath: null, indices: ['dictionary', 'character'] },
 };
 
 const STORE_NAMES = Object.keys(STRUCTURE) as ObjectStoreName[];
@@ -56,6 +61,8 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 function toIdbRange(range: KeyRange): IDBKeyRange {
     return range.kind === 'only' ? IDBKeyRange.only(range.value) : IDBKeyRange.bound(range.value, `${range.value}￿`);
 }
+
+const BLOCKED_MESSAGE = 'Close other tabs of this app to finish upgrading the dictionary database';
 
 export type IndexedDbStorageOptions = {
     /** IndexedDB database name. Yomitan uses `dict`. */
@@ -101,7 +108,28 @@ class IndexedDbBackend implements StorageBackend {
                 }
             }
         };
-        this.database = await promisify(request);
+        this.database = await new Promise<IDBDatabase>((resolve, reject) => {
+            let rejected = false;
+            request.onsuccess = () => {
+                if (rejected) {
+                    // The upgrade went through after we gave up on it; don't keep it open.
+                    request.result.close();
+                    return;
+                }
+                resolve(request.result);
+            };
+            request.onerror = () => reject(request.error);
+            // Connections of other tabs that don't close (older versions) stall the upgrade.
+            request.onblocked = () => {
+                rejected = true;
+                reject(new Error(BLOCKED_MESSAGE));
+            };
+        });
+        // Let a future upgrade (or deleting the database) proceed in another tab.
+        this.database.onversionchange = () => {
+            this.database?.close();
+            this.database = null;
+        };
     }
 
     async close(): Promise<void> {
@@ -215,6 +243,59 @@ class IndexedDbBackend implements StorageBackend {
         });
         await transactionDone(transaction);
         return deleted;
+    }
+
+    async replaceWhere(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        rows: Record<string, unknown>[],
+        guard?: WriteGuard,
+    ): Promise<void> {
+        await guard?.();
+        const transaction = this.db().transaction([store], 'readwrite');
+        const objectStore = transaction.objectStore(store);
+        const request = objectStore.index(index).openKeyCursor(IDBKeyRange.only(value));
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (cursor === null) {
+                for (const row of rows) {
+                    objectStore.add(row);
+                }
+                return;
+            }
+            objectStore.delete(cursor.primaryKey);
+            cursor.continue();
+        };
+        await transactionDone(transaction);
+    }
+
+    async scan(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        batchSize: number,
+        onBatch: (rows: Record<string, unknown>[]) => void,
+    ): Promise<void> {
+        const transaction = this.db().transaction([store], 'readonly');
+        const request = transaction.objectStore(store).index(index).openCursor(IDBKeyRange.only(value));
+        let batch: Record<string, unknown>[] = [];
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (cursor === null) {
+                if (batch.length > 0) {
+                    onBatch(batch);
+                }
+                return;
+            }
+            batch.push(cursor.value as Record<string, unknown>);
+            if (batch.length >= batchSize) {
+                onBatch(batch);
+                batch = [];
+            }
+            cursor.continue();
+        };
+        await transactionDone(transaction);
     }
 
     private db(): IDBDatabase {

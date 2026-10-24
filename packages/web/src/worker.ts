@@ -47,11 +47,13 @@ const METHODS = new Set([
     'dictionaries.getMedia',
     'lookup.terms',
     'lookup.kanji',
+    'lookup.termsContaining',
     'lookup.scan',
     'lookup.parse',
     'lookup.segment',
     'lookup.sentence',
     'render.html',
+    'render.glossaries',
     'render.document',
     'render.css',
     'render.attributes',
@@ -307,6 +309,7 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
         lookup: {
             terms: remote('lookup.terms'),
             kanji: remote('lookup.kanji'),
+            termsContaining: remote('lookup.termsContaining'),
             scan: remote('lookup.scan'),
             parse: remote('lookup.parse'),
             segment: remote('lookup.segment'),
@@ -314,6 +317,7 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
         },
         render: {
             html: remote('render.html'),
+            glossaries: remote('render.glossaries'),
             document: remote('render.document'),
             css: remote('render.css'),
             attributes: (theme?: Parameters<Yomitan['render']['attributes']>[0]) =>

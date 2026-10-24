@@ -119,12 +119,14 @@ yomitan.dictionaries.recommended(language) / getMedia(title, path)
 
 yomitan.lookup.terms(text, { mode?, primaryReading? })   // Yomitan's findTerms with profile-derived options; per-call details as in Yomitan's termsFind
 yomitan.lookup.kanji(text)
+yomitan.lookup.termsContaining(kanji, { limit?, dictionary? })   // most frequent terms containing a kanji, from a per-dictionary index built at import
 yomitan.lookup.scan(text, offset)       // Yomitan's TextScanner semantics: entries, matched range, sentence
 yomitan.lookup.parse(text)              // Yomitan's scanning parser: segments with UTF-16 ranges and furigana
 yomitan.lookup.segment(text)            // not in Yomitan: lattice segmentation into words with entries (see CONTEXT.md, Segment)
 yomitan.lookup.sentence(text, offset)
 
 yomitan.render.views(entries)           // EntryView[]
+yomitan.render.glossaries(entry, { media? })   // GlossaryBlock[]: one definition-list HTML block per dictionary, for host-rendered UIs
 yomitan.render.html(entries, { styles: 'inline' | 'external', media: 'placeholder' | 'data-uri' | 'anki' | { urlTemplate } })
     // urlTemplate: a string such as 'app://media/{dictionary}/{path}', with URL-encoded substitution
 

@@ -26,7 +26,9 @@ import { setUpstreamFetch } from '../platform/upstream-env';
 import { type Profile, ProfileFormat, syncDictionarySettings } from '../profile/profile';
 import { type ThemeContext, getCustomCss, getDisplayAttributes } from '../render/display-options';
 import { EntryRenderer, createStringDomEnvironment } from '../render/entry-renderer';
+import { type GlossaryBlock, groupGlossaryBlocks } from '../render/glossaries';
 import { type HtmlMediaMode, getPopupCss, renderHtmlDocument, resolveImages } from '../render/html';
+import { type KanjiTerm, isSingleKanji } from '../storage/kanji-term-index';
 import { recoverWriteSessions } from '../storage/sessions';
 import type { Summary, YomitanStorage } from '../storage/types';
 import { compareRevisions } from '../upstream/ext/js/dictionary/dictionary-data-util.js';
@@ -95,6 +97,13 @@ export type ImportOptions = {
 export type TermLookupOptions = FindTermsDetails & { mode?: FindTermsMode };
 
 export type TermLookupResult = { entries: TermDictionaryEntry[]; originalTextLength: number };
+
+export type TermsContainingOptions = {
+    /** How many terms to return, at most 50 (what the index keeps per dictionary). Default 30. */
+    limit?: number;
+    /** The frequency dictionary's title. Default: the profile's sort frequency dictionary, else the first enabled one with term frequencies. */
+    dictionary?: string;
+};
 
 export type Media = {
     dictionary: string;
@@ -305,7 +314,15 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 outcome = { result: null, errors: [error instanceof Error ? error : new Error(String(error))] };
             }
             await beforeFinish?.();
-            const { result, errors } = outcome;
+            let { result, errors } = outcome;
+            if (errors.length === 0 && (result?.counts?.termMeta?.freq ?? 0) > 0) {
+                // The kanji-term index is part of the import: a failure here fails (and cleans up) the import.
+                try {
+                    await guarded.buildKanjiTermIndex(title, result?.frequencyMode);
+                } catch (error) {
+                    errors = [error instanceof Error ? error : new Error(String(error))];
+                }
+            }
             if (errors.length > 0 || result === null || signal?.aborted) {
                 // Atomic import: remove whatever was written (a listed deviation from upstream).
                 try {
@@ -486,18 +503,105 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return media === undefined ? null : { mediaType: media.mediaType, content: new Uint8Array(media.content) };
     };
 
-    const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> => {
+    const renderEntryNodes = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<StringElement[]> => {
         stringRenderer ??= EntryRenderer.create<StringElement>(createStringDomEnvironment());
         const renderer = await stringRenderer;
         renderer.setLanguage(profile.options.general.language);
         const dictionaryInfo = await listInstalled();
-        let html = '';
+        const nodes: StringElement[] = [];
         for (const entry of entries) {
             const node = renderer.render(entry, dictionaryInfo);
             await resolveImages(node, media, getMediaBytes);
-            html += node.outerHTML;
+            nodes.push(node);
         }
-        return html;
+        return nodes;
+    };
+
+    const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> =>
+        (await renderEntryNodes(entries, media)).map((node) => node.outerHTML).join('');
+
+    /**
+     * Builds the index of a dictionary that has none, under the write session imports and deletes use,
+     * so no other writer can delete or replace the dictionary meanwhile. What is indexed is whatever
+     * dictionary of that title is installed once the session is held, not the one the caller saw.
+     */
+    const buildKanjiTermIndexExclusively = async (title: string, character: string): Promise<void> => {
+        await recoverWriteSessions(storage, storage.sessions);
+        const session = await storage.sessions.begin('index', title);
+        try {
+            const current = (await storage.getDictionaryInfo()).find(
+                (summary) => summary.title === title && summary.importSuccess !== false,
+            );
+            // Gone, or indexed by someone else while we waited.
+            if (current === undefined || (await storage.findKanjiTerms(character, title)) !== null) {
+                return;
+            }
+            await storage.withWriteGuard(session.guard).buildKanjiTermIndex(title, current.frequencyMode);
+        } finally {
+            await session.end();
+        }
+    };
+
+    /** Builds that are running, so concurrent calls for one dictionary share a scan. */
+    const kanjiTermIndexBuilds = new Map<string, Promise<void>>();
+
+    const ensureKanjiTermIndex = (title: string, character: string): Promise<void> => {
+        let build = kanjiTermIndexBuilds.get(title);
+        if (build === undefined) {
+            build = buildKanjiTermIndexExclusively(title, character).finally(() => {
+                kanjiTermIndexBuilds.delete(title);
+            });
+            kanjiTermIndexBuilds.set(title, build);
+        }
+        return build;
+    };
+
+    /**
+     * The dictionary `termsContaining` reads. An explicit one must be installed and have term
+     * frequencies. Otherwise: the profile's sort frequency dictionary if it is enabled and has them,
+     * else the first enabled dictionary that does.
+     */
+    const pickFrequencyDictionary = (installed: Summary[], requested?: string): Summary | undefined => {
+        const hasFrequencies = ({ counts }: Summary) => (counts?.termMeta?.freq ?? 0) > 0;
+        const { dictionaries, general } = profile.options;
+        const enabled = new Set(dictionaries.filter(({ enabled }) => enabled).map(({ name }) => name));
+        const find = (title: string | null | undefined, mustBeEnabled: boolean) =>
+            installed.find(
+                (summary) =>
+                    summary.title === title && hasFrequencies(summary) && (!mustBeEnabled || enabled.has(title)),
+            );
+        if (requested !== undefined) {
+            const summary = find(requested, false);
+            if (summary === undefined) {
+                throw new Error(`${requested} is not an installed dictionary with term frequencies`);
+            }
+            return summary;
+        }
+        return (
+            find(general.sortFrequencyDictionary, true) ??
+            dictionaries.map(({ name }) => find(name, true)).find((summary) => summary !== undefined)
+        );
+    };
+
+    /** Frequency dictionaries that don't name readings leave `reading` empty; fill it from the enabled dictionaries. */
+    const fillReadings = async (terms: KanjiTerm[]): Promise<KanjiTerm[]> => {
+        const missing = terms.filter(({ reading }) => reading === '');
+        if (missing.length === 0) {
+            return terms;
+        }
+        const enabled = new Set(profile.options.dictionaries.filter(({ enabled }) => enabled).map(({ name }) => name));
+        const found = await storage.findTermsBulk(
+            missing.map(({ term }) => term),
+            enabled,
+            'exact',
+        );
+        const readings = new Map<string, string>();
+        for (const { term, reading, matchSource } of found) {
+            if (matchSource === 'term' && !readings.has(term)) {
+                readings.set(term, reading);
+            }
+        }
+        return terms.map((item) => (item.reading === '' ? { ...item, reading: readings.get(item.term) ?? '' } : item));
     };
 
     return {
@@ -622,6 +726,33 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 entries.splice(profile.options.general.maxResults);
                 return entries;
             },
+            /**
+             * The most frequent terms that contain the kanji `character` (anywhere in the term), best
+             * first, one row per term. They come from one frequency dictionary's index, which is built
+             * when the dictionary is imported. A dictionary imported before that existed is indexed on
+             * the first call: one scan of all its term meta (seconds for the largest dictionaries),
+             * then it is stored (it takes the write session of imports and deletes, so it throws
+             * `StorageBusyError` while one runs). Frequencies of kana spellings (displayValue marked ㋕, as JPDB and
+             * Jiten do) are ignored. For `rank-based` dictionaries (the default) `frequency` is the
+             * rank and lower is more frequent; for `occurrence-based` ones it is the count, highest first.
+             * Returns `[]` for anything but a single kanji or when no dictionary has term frequencies.
+             */
+            async termsContaining(
+                character: string,
+                { limit = 30, dictionary }: TermsContainingOptions = {},
+            ): Promise<KanjiTerm[]> {
+                assertUsable();
+                const summary = pickFrequencyDictionary(await listInstalled(), dictionary);
+                if (summary === undefined || !isSingleKanji(character)) {
+                    return [];
+                }
+                let terms = await storage.findKanjiTerms(character, summary.title);
+                if (terms === null) {
+                    await ensureKanjiTermIndex(summary.title, character);
+                    terms = (await storage.findKanjiTerms(character, summary.title)) ?? [];
+                }
+                return await fillReadings(terms.slice(0, Math.max(0, limit)));
+            },
             /** What Yomitan shows when the pointer lands at `offset` (UTF-16) in `text`. */
             scan(text: string, offset: number): Promise<ScanResult | null> {
                 assertUsable();
@@ -684,6 +815,21 @@ export async function createYomitan(options: CreateYomitanOptions) {
             ): Promise<string> {
                 assertUsable();
                 return renderEntriesHtml(entries, media);
+            },
+            /**
+             * A term entry's definitions split by dictionary, in the entry's dictionary order, for hosts
+             * that render headwords, pitch, frequencies and actions themselves but keep Yomitan's glossary
+             * markup (structured content, images, definition tags). Style it with `css()` and
+             * `attributes()`, like `html()`; `media` works as in `html()`, and `findGlossImages` finds
+             * the images in rendered blocks.
+             */
+            async glossaries(
+                entry: TermDictionaryEntry,
+                { media = 'placeholder' }: { media?: HtmlMediaMode } = {},
+            ): Promise<GlossaryBlock[]> {
+                assertUsable();
+                const [node] = await renderEntryNodes([entry], media);
+                return groupGlossaryBlocks(entry, node);
             },
             /** A standalone HTML document of the entries, styled like Yomitan's popup (for WebViews). */
             async document(

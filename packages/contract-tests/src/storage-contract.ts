@@ -284,6 +284,87 @@ export function runStorageContract(label: string, createStorage: CreateStorage):
             await storage.close();
         });
 
+        test('keeps a kanji-term index per dictionary, rebuilt on demand and deleted with the dictionary', async ({
+            expect,
+        }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            const title = 'Test Dictionary';
+            await importFixture(storage, await createDictionaryArchive('valid-dictionary1'));
+            await importFixture(storage, await createDictionaryArchive('valid-dictionary1', { title: 'Other' }));
+            expect(await storage.findKanjiTerms('打', title)).toBeNull();
+
+            await storage.buildKanjiTermIndex(title, undefined);
+            const terms = await storage.findKanjiTerms('打', title);
+            expect(terms?.map(({ term, frequency }) => [term, frequency])).toEqual([
+                ['打', 1],
+                ['打つ', 2],
+                ['打ち込む', 3],
+            ]);
+            expect(await storage.findKanjiTerms('字', title)).toEqual([]);
+            expect(await storage.findKanjiTerms('打', 'Other')).toBeNull();
+            // Occurrence-based dictionaries rank the highest value first.
+            await storage.buildKanjiTermIndex(title, 'occurrence-based');
+            const occurrences = await storage.findKanjiTerms('打', title);
+            expect(occurrences?.map(({ term }) => term)).toEqual(['打ち込む', '打つ', '打']);
+            // The index is not part of the dictionary counts.
+            expect((await storage.getDictionaryCounts([title], false)).counts[0]).toStrictEqual(
+                (await storage.getDictionaryCounts(['Other'], false)).counts[0],
+            );
+
+            await storage.buildKanjiTermIndex('Other', undefined);
+            await storage.deleteDictionary(title, 1000, () => {});
+            expect(await storage.findKanjiTerms('打', title)).toBeNull();
+            expect((await storage.findKanjiTerms('打', 'Other'))?.length).toBe(3);
+            await storage.purge();
+            expect(await storage.findKanjiTerms('打', 'Other')).toBeNull();
+            await storage.close();
+        });
+
+        test('scans a large dictionary in batches when building the kanji-term index', async ({ expect }) => {
+            const storage = await createStorage();
+            await storage.prepare();
+            // More rows than one scan batch; the most frequent terms come last, and one term is repeated.
+            const count = 12_000;
+            const rows = Array.from({ length: count }, (_, i) => ({
+                expression: `字${String.fromCodePoint(0x4e00 + i)}`,
+                mode: 'freq',
+                data: { reading: 'じ', frequency: count - i },
+                dictionary: 'Big',
+            }));
+            rows.push({ expression: '字一', mode: 'freq', data: { reading: 'じ', frequency: 0.5 }, dictionary: 'Big' });
+            await storage.bulkAdd('termMeta', rows, 0, rows.length);
+            await storage.bulkAdd('termMeta', [{ ...rows[0], dictionary: 'Other' }], 0, 1);
+            await storage.buildKanjiTermIndex('Big', 'rank-based');
+            const terms = await storage.findKanjiTerms('字', 'Big');
+            expect(terms?.length).toBe(50);
+            expect(terms?.slice(0, 3).map(({ term, frequency }) => [term, frequency])).toEqual([
+                ['字一', 0.5],
+                [`字${String.fromCodePoint(0x4e00 + count - 1)}`, 1],
+                [`字${String.fromCodePoint(0x4e00 + count - 2)}`, 2],
+            ]);
+            expect(await storage.findKanjiTerms('字', 'Other')).toBeNull();
+            await storage.close();
+        });
+
+        test('a failing write guard leaves the kanji-term index as it was', async ({ expect }) => {
+            const storage = (await createStorage()) as DictionaryStorage & {
+                withWriteGuard(guard: () => Promise<void>): DictionaryStorage;
+            };
+            await storage.prepare();
+            const title = 'Test Dictionary';
+            await importFixture(storage, await createDictionaryArchive('valid-dictionary1'));
+            await storage.buildKanjiTermIndex(title, undefined);
+            const before = await storage.findKanjiTerms('打', title);
+            const lost = new Error('session lost');
+            const guarded = storage.withWriteGuard(async () => {
+                throw lost;
+            });
+            await expect(guarded.buildKanjiTermIndex(title, 'occurrence-based')).rejects.toBe(lost);
+            expect(await storage.findKanjiTerms('打', title)).toEqual(before);
+            await storage.close();
+        });
+
         for (const clearMethod of ['purge', 'delete'] as const) {
             test(`empties the database with ${clearMethod}`, async ({ expect }) => {
                 const storage = await createStorage();
