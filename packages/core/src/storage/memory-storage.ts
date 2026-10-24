@@ -139,6 +139,42 @@ class MemoryBackend implements StorageBackend {
         return ids.length;
     }
 
+    async replaceWhere(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        rows: Record<string, unknown>[],
+        guard?: WriteGuard,
+    ): Promise<void> {
+        await guard?.();
+        const target = this.getStore(store);
+        for (const id of this.getIndex(target, index).get(value) ?? []) {
+            target.rows.delete(id);
+        }
+        for (const row of rows) {
+            target.rows.set(target.nextId++, cloneValue(row));
+        }
+        target.indexes.clear();
+    }
+
+    async scan(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        batchSize: number,
+        onBatch: (rows: Record<string, unknown>[]) => void,
+    ): Promise<void> {
+        const target = this.getStore(store);
+        const ids = [...(this.getIndex(target, index).get(value) ?? [])];
+        for (let start = 0; start < ids.length; start += batchSize) {
+            onBatch(
+                ids
+                    .slice(start, start + batchSize)
+                    .map((id) => cloneValue(target.rows.get(id) as Record<string, unknown>)),
+            );
+        }
+    }
+
     private reset(): void {
         this.stores = new Map(STORE_NAMES.map((name) => [name, { rows: new Map(), nextId: 1, indexes: new Map() }]));
     }

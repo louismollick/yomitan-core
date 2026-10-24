@@ -520,35 +520,67 @@ export async function createYomitan(options: CreateYomitanOptions) {
     const renderEntriesHtml = async (entries: DictionaryEntry[], media: HtmlMediaMode): Promise<string> =>
         (await renderEntryNodes(entries, media)).map((node) => node.outerHTML).join('');
 
+    /**
+     * Builds the index of a dictionary that has none, under the write session imports and deletes use,
+     * so no other writer can delete or replace the dictionary meanwhile. What is indexed is whatever
+     * dictionary of that title is installed once the session is held, not the one the caller saw.
+     */
+    const buildKanjiTermIndexExclusively = async (title: string, character: string): Promise<void> => {
+        await recoverWriteSessions(storage, storage.sessions);
+        const session = await storage.sessions.begin('index', title);
+        try {
+            const current = (await storage.getDictionaryInfo()).find(
+                (summary) => summary.title === title && summary.importSuccess !== false,
+            );
+            // Gone, or indexed by someone else while we waited.
+            if (current === undefined || (await storage.findKanjiTerms(character, title)) !== null) {
+                return;
+            }
+            await storage.withWriteGuard(session.guard).buildKanjiTermIndex(title, current.frequencyMode);
+        } finally {
+            await session.end();
+        }
+    };
+
     /** Builds that are running, so concurrent calls for one dictionary share a scan. */
     const kanjiTermIndexBuilds = new Map<string, Promise<void>>();
 
-    const ensureKanjiTermIndex = (summary: Summary): Promise<void> => {
-        let build = kanjiTermIndexBuilds.get(summary.title);
+    const ensureKanjiTermIndex = (title: string, character: string): Promise<void> => {
+        let build = kanjiTermIndexBuilds.get(title);
         if (build === undefined) {
-            build = storage.buildKanjiTermIndex(summary.title, summary.frequencyMode).finally(() => {
-                kanjiTermIndexBuilds.delete(summary.title);
+            build = buildKanjiTermIndexExclusively(title, character).finally(() => {
+                kanjiTermIndexBuilds.delete(title);
             });
-            kanjiTermIndexBuilds.set(summary.title, build);
+            kanjiTermIndexBuilds.set(title, build);
         }
         return build;
     };
 
-    /** The dictionary `termsContaining` reads: the requested one, else the sort dictionary, else the first enabled. */
+    /**
+     * The dictionary `termsContaining` reads. An explicit one must be installed and have term
+     * frequencies. Otherwise: the profile's sort frequency dictionary if it is enabled and has them,
+     * else the first enabled dictionary that does.
+     */
     const pickFrequencyDictionary = (installed: Summary[], requested?: string): Summary | undefined => {
         const hasFrequencies = ({ counts }: Summary) => (counts?.termMeta?.freq ?? 0) > 0;
-        const find = (title: string | null | undefined) =>
-            installed.find((summary) => summary.title === title && hasFrequencies(summary));
+        const { dictionaries, general } = profile.options;
+        const enabled = new Set(dictionaries.filter(({ enabled }) => enabled).map(({ name }) => name));
+        const find = (title: string | null | undefined, mustBeEnabled: boolean) =>
+            installed.find(
+                (summary) =>
+                    summary.title === title && hasFrequencies(summary) && (!mustBeEnabled || enabled.has(title)),
+            );
         if (requested !== undefined) {
-            const summary = find(requested);
+            const summary = find(requested, false);
             if (summary === undefined) {
                 throw new Error(`${requested} is not an installed dictionary with term frequencies`);
             }
             return summary;
         }
-        const { dictionaries, general } = profile.options;
-        const sorted = find(general.sortFrequencyDictionary);
-        return sorted ?? dictionaries.map(({ enabled, name }) => (enabled ? find(name) : undefined)).find(Boolean);
+        return (
+            find(general.sortFrequencyDictionary, true) ??
+            dictionaries.map(({ name }) => find(name, true)).find((summary) => summary !== undefined)
+        );
     };
 
     /** Frequency dictionaries that don't name readings leave `reading` empty; fill it from the enabled dictionaries. */
@@ -699,7 +731,8 @@ export async function createYomitan(options: CreateYomitanOptions) {
              * first, one row per term. They come from one frequency dictionary's index, which is built
              * when the dictionary is imported. A dictionary imported before that existed is indexed on
              * the first call: one scan of all its term meta (seconds for the largest dictionaries),
-             * then it is stored. Frequencies of kana spellings (displayValue marked ㋕, as JPDB and
+             * then it is stored (it takes the write session of imports and deletes, so it throws
+             * `StorageBusyError` while one runs). Frequencies of kana spellings (displayValue marked ㋕, as JPDB and
              * Jiten do) are ignored. For `rank-based` dictionaries (the default) `frequency` is the
              * rank and lower is more frequent; for `occurrence-based` ones it is the count, highest first.
              * Returns `[]` for anything but a single kanji or when no dictionary has term frequencies.
@@ -715,7 +748,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
                 }
                 let terms = await storage.findKanjiTerms(character, summary.title);
                 if (terms === null) {
-                    await ensureKanjiTermIndex(summary);
+                    await ensureKanjiTermIndex(summary.title, character);
                     terms = (await storage.findKanjiTerms(character, summary.title)) ?? [];
                 }
                 return await fillReadings(terms.slice(0, Math.max(0, limit)));

@@ -13,6 +13,7 @@ import {
     createZipArchiveReader,
     importDictionaryArchive,
 } from 'yomitan-core';
+import type { YomitanStorage } from '../../core/src/storage/types';
 import type { CreateClientStorage } from './client-contract';
 import { zipFiles } from './fixtures';
 
@@ -134,6 +135,86 @@ export function runTermsContainingContract(
             await expect(client.lookup.termsContaining('学', { dictionary: 'Plain' })).rejects.toThrow('Plain');
             await expect(client.lookup.termsContaining('学', { dictionary: 'Missing' })).rejects.toThrow('Missing');
             await client.dispose();
+        });
+
+        test('ignores a sort frequency dictionary that is disabled', async ({ expect }) => {
+            const { client } = await clientWith(
+                await frequencyArchive(RANK, 'rank-based', RANK_META),
+                await frequencyArchive(COUNT, 'occurrence-based', COUNT_META),
+            );
+            const profile = client.profile.get();
+            profile.options.general.sortFrequencyDictionary = COUNT;
+            profile.options.dictionaries.find(({ name }) => name === COUNT)!.enabled = false;
+            await client.profile.set(profile);
+            expect((await client.lookup.termsContaining('学')).slice(0, 2).map(({ term }) => term)).toEqual([
+                '学',
+                '大学',
+            ]);
+            // An explicit dictionary is still honoured.
+            expect((await client.lookup.termsContaining('学', { dictionary: COUNT }))[0].term).toBe('大学');
+            await client.dispose();
+        });
+
+        describe('lazy index builds', () => {
+            /** A frequency dictionary imported without the index, and a client on the same storage. */
+            async function unindexed() {
+                const storage = await createStorage();
+                await storage.prepare();
+                const { errors } = await importDictionaryArchive(
+                    storage,
+                    createZipArchiveReader(await frequencyArchive(RANK, 'rank-based', RANK_META, RANK_TERMS)),
+                );
+                if (errors.length > 0) {
+                    throw errors[0];
+                }
+                const client = await makeClient({ storage });
+                await client.profile.syncDictionaries();
+                return { storage, client };
+            }
+
+            /** Runs `action` right after the index build has taken its write session. */
+            function afterIndexSessionBegins(storage: YomitanStorage, action: () => Promise<void>) {
+                const { sessions } = storage;
+                const begin = sessions.begin.bind(sessions);
+                sessions.begin = async (kind, title) => {
+                    const session = await begin(kind, title);
+                    if (kind === 'index') {
+                        await action();
+                    }
+                    return session;
+                };
+            }
+
+            test('take the write session, so they wait out imports and deletes', async ({ expect }) => {
+                const { storage, client } = await unindexed();
+                const held = await storage.sessions.begin('import', 'Elsewhere');
+                await expect(client.lookup.termsContaining('学')).rejects.toMatchObject({ code: 'busy' });
+                expect(await storage.findKanjiTerms('学', RANK)).toBeNull();
+                await held.end();
+                expect(await client.lookup.termsContaining('学')).toHaveLength(6);
+                await client.dispose();
+            });
+
+            test('write nothing for a dictionary deleted before the session was held', async ({ expect }) => {
+                const { storage, client } = await unindexed();
+                afterIndexSessionBegins(storage, () => storage.deleteDictionary(RANK, 1000, () => {}));
+                expect(await client.lookup.termsContaining('学')).toEqual([]);
+                expect(await storage.findKanjiTerms('学', RANK)).toBeNull();
+                expect(await storage.getDictionaryInfo()).toEqual([]);
+                await client.dispose();
+            });
+
+            test('index the dictionary that is installed once the session is held', async ({ expect }) => {
+                const { storage, client } = await unindexed();
+                afterIndexSessionBegins(storage, async () => {
+                    await storage.deleteDictionary(RANK, 1000, () => {});
+                    const replacement = await frequencyArchive(RANK, 'rank-based', [['学', 'freq', 1]]);
+                    await importDictionaryArchive(storage, createZipArchiveReader(replacement));
+                });
+                expect((await client.lookup.termsContaining('学')).map(({ term }) => term)).toEqual(['学']);
+                expect((await storage.findKanjiTerms('学', RANK))?.length).toBe(1);
+                await client.dispose();
+            });
         });
 
         test('builds the index at import, and deletes it with the dictionary', async ({ expect }) => {

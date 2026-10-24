@@ -106,4 +106,27 @@ export interface StorageBackend {
     put(store: ObjectStoreName, id: number, row: Record<string, unknown>, guard?: WriteGuard): Promise<void>;
     /** Deletes rows whose `index` field equals `value`; returns how many were deleted. */
     deleteWhere(store: ObjectStoreName, index: string, value: string, guard?: WriteGuard): Promise<number>;
+    /**
+     * Replaces, in one transaction, the rows whose `index` field equals `value` with `rows`. `guard`
+     * runs first, as in {@link StorageBackend.add}.
+     */
+    replaceWhere(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        rows: Record<string, unknown>[],
+        guard?: WriteGuard,
+    ): Promise<void>;
+    /**
+     * Reads the rows whose `index` field equals `value` in primary key order, calling `onBatch` with at
+     * most `batchSize` rows at a time, so that scanning a large dictionary needs memory for one batch.
+     * `onBatch` must be synchronous (an IndexedDB transaction ends when it awaits anything else).
+     */
+    scan(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        batchSize: number,
+        onBatch: (rows: Record<string, unknown>[]) => void,
+    ): Promise<void>;
 }

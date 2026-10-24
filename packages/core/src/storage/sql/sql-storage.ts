@@ -221,9 +221,7 @@ export class SqlBackend implements StorageBackend {
     }
 
     add(store: ObjectStoreName, rows: Record<string, unknown>[], guard?: WriteGuard): Promise<number[]> {
-        const { columns, blob } = STORES[store];
-        const allColumns = [...columns, 'data', ...(blob === undefined ? [] : [blob])];
-        const sql = `INSERT INTO ${quote(store)} (${allColumns.map(quote).join(', ')}) VALUES (${allColumns.map(() => '?').join(', ')})`;
+        const sql = this.insertSql(store);
         return this.transaction(async () => {
             if (guard !== undefined) {
                 await guard();
@@ -260,6 +258,54 @@ export class SqlBackend implements StorageBackend {
         });
     }
 
+    replaceWhere(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        rows: Record<string, unknown>[],
+        guard?: WriteGuard,
+    ): Promise<void> {
+        this.assertColumn(store, index);
+        const sql = this.insertSql(store);
+        return this.transaction(async () => {
+            if (guard !== undefined) {
+                await guard();
+            }
+            await this.driver.run(`DELETE FROM ${quote(store)} WHERE ${quote(index)} = ?`, [value]);
+            for (const row of rows) {
+                await this.driver.run(sql, this.toParams(store, row));
+            }
+        });
+    }
+
+    async scan(
+        store: ObjectStoreName,
+        index: string,
+        value: string,
+        batchSize: number,
+        onBatch: (rows: Record<string, unknown>[]) => void,
+    ): Promise<void> {
+        this.assertColumn(store, index);
+        // Keyset pagination by primary key; each page is its own call, so writers can interleave.
+        let after = 0;
+        for (;;) {
+            const rows = await this.mutex.run(() =>
+                this.driver.all<RawRow>(
+                    `SELECT * FROM ${quote(store)} WHERE ${quote(index)} = ? AND id > ? ORDER BY id LIMIT ?`,
+                    [value, after, batchSize],
+                ),
+            );
+            if (rows.length === 0) {
+                return;
+            }
+            onBatch(rows.map((row) => this.toStoredRow(store, row).value));
+            if (rows.length < batchSize) {
+                return;
+            }
+            after = Number(rows[rows.length - 1].id);
+        }
+    }
+
     /** Runs `fn` serialized with every other backend call, without a write transaction. */
     read<T>(fn: () => Promise<T>): Promise<T> {
         return this.mutex.run(fn);
@@ -289,6 +335,12 @@ export class SqlBackend implements StorageBackend {
                 throw error;
             }
         });
+    }
+
+    private insertSql(store: ObjectStoreName): string {
+        const { columns, blob } = STORES[store];
+        const allColumns = [...columns, 'data', ...(blob === undefined ? [] : [blob])];
+        return `INSERT INTO ${quote(store)} (${allColumns.map(quote).join(', ')}) VALUES (${allColumns.map(() => '?').join(', ')})`;
     }
 
     private assertColumn(store: ObjectStoreName, column: string): void {

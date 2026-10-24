@@ -7,7 +7,7 @@
  * non-IndexedDB adapter returns exactly what upstream's IndexedDB class returns, in the same order.
  */
 
-import { type KanjiTerm, buildKanjiTermRows } from './kanji-term-index';
+import { type KanjiTerm, KanjiTermIndexBuilder } from './kanji-term-index';
 import type {
     DDB,
     DictionarySet,
@@ -21,6 +21,9 @@ import type {
 } from './types';
 
 const DICTIONARY_STORES: ObjectStoreName[] = ['kanji', 'kanjiMeta', 'terms', 'termMeta', 'tagMeta', 'media'];
+
+/** Rows read per batch when scanning a dictionary's term meta. */
+const SCAN_BATCH_SIZE = 5000;
 
 /** Everything deleted with a dictionary: its data stores, plus the derived kanji-term index. */
 const DELETED_WITH_DICTIONARY: ObjectStoreName[] = [...DICTIONARY_STORES, 'kanjiTerms'];
@@ -403,15 +406,16 @@ export class IndexedDictionaryStorage implements DictionaryStorage {
 
     async buildKanjiTermIndex(dictionary: string, frequencyMode: Summary['frequencyMode']): Promise<void> {
         this.assertOpen();
-        const termMeta = await this.backend.getAll('termMeta', 'dictionary', { kind: 'only', value: dictionary });
-        const rows = buildKanjiTermRows(
+        const builder = new KanjiTermIndexBuilder(frequencyMode);
+        await this.backend.scan('termMeta', 'dictionary', dictionary, SCAN_BATCH_SIZE, (rows) => builder.addAll(rows));
+        // The marker row is last and written with the rest in one transaction, so a half-built index is never trusted.
+        await this.backend.replaceWhere(
+            'kanjiTerms',
+            'dictionary',
             dictionary,
-            termMeta.map(({ value }) => value),
-            frequencyMode,
+            builder.rows(dictionary) as unknown as Record<string, unknown>[],
+            this.writeGuard,
         );
-        // The marker row is last and written with the rest, so a half-built index is never trusted.
-        await this.backend.deleteWhere('kanjiTerms', 'dictionary', dictionary, this.writeGuard);
-        await this.backend.add('kanjiTerms', rows as unknown as Record<string, unknown>[], this.writeGuard);
     }
 
     private assertOpen(): void {

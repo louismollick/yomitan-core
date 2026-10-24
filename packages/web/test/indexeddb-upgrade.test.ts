@@ -46,3 +46,44 @@ test('a version 60 database (Yomitan schema) gains the kanjiTerms store and keep
     expect((await storage.findKanjiTerms('学', 'Old'))?.map(({ term }) => term)).toEqual(['学']);
     await storage.close();
 });
+
+function openRaw(name: string, version: number): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(name, version);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+test('an upgrade blocked by another tab rejects with an actionable error and leaves no connection open', async () => {
+    const locks = createMemoryLockManager();
+    const name = 'upgrade-blocked';
+    // An older tab that keeps its version 60 connection open and ignores versionchange.
+    const older = await openRaw(name, 60);
+    const storage = createIndexedDbStorage({ name, locks });
+    await expect(storage.prepare()).rejects.toThrow('Close other tabs of this app');
+    // The old tab goes away, the upgrade completes late, and its connection is closed again.
+    older.close();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const newer = await openRaw(name, 62);
+    expect(newer.version).toBe(62);
+    newer.close();
+});
+
+test('an open connection closes on versionchange so later upgrades are not blocked', async () => {
+    const locks = createMemoryLockManager();
+    const name = 'upgrade-versionchange';
+    const storage = createIndexedDbStorage({ name, locks });
+    await storage.prepare();
+    let blocked = false;
+    const request = indexedDB.open(name, 62);
+    request.onblocked = () => {
+        blocked = true;
+    };
+    const upgraded = await new Promise<IDBDatabase>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+    expect(blocked).toBe(false);
+    upgraded.close();
+});
