@@ -121,9 +121,11 @@ Consumers provide their own layout over entry views, while the default stays Yom
 
 Yomitan can parse text with MeCab (`comm/mecab.js`, `_textParseMecab`, and the `/tokenize` API from #2254) as well as with its scanning parser.
 
-**Scope.** A tokenizer interface for `lookup.parse`, with the scanning parser as the default adapter. A consumer could plug in a MeCab/Sudachi/kuromoji adapter, or a server.
+**Where the library stands.** `lookup.segment` is the default word splitter: a lattice over every dictionary match, scored by frequency rank, which fixes the greedy parser swallowing the next word. `lookup.parse` stays Yomitan's greedy scanning parser, for parity.
 
-**Who needs it.** Nobody yet. Parsing quality for long texts (substreamer lyrics) is the likely trigger.
+**Scope.** A tokenizer interface for `lookup.segment`, with the lattice as the default adapter. A consumer could plug in a MeCab/Sudachi/kuromoji adapter, or a server, and still get dictionary entries per token.
+
+**Who needs it.** Nobody yet. Segmentation quality for long texts (substreamer lyrics) is the likely trigger.
 
 ### 9. Search-query niceties (S)
 
