@@ -1,3 +1,16 @@
+# [2.3.0](https://github.com/louismollick/yomitan-core/compare/v2.2.0...v2.3.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **lookup:** make the kanji-term index build safe, bounded and correct ([5c1bd7f](https://github.com/louismollick/yomitan-core/commit/5c1bd7f105144edb49f71c57d2232e267e851c9b))
+
+
+### Features
+
+* **lookup:** termsContaining, the most frequent terms containing a kanji ([b6777a2](https://github.com/louismollick/yomitan-core/commit/b6777a29125681ed0d33e0a7cae9119d58a95ce9))
+* **render:** glossaries, per-dictionary glossary HTML for host-rendered entries ([602d15f](https://github.com/louismollick/yomitan-core/commit/602d15f05486988ad4fa4e5d771f3605ad2a82e5))
+
 # [2.2.0](https://github.com/louismollick/yomitan-core/compare/v2.1.0...v2.2.0) (2026-10-24)
 
 

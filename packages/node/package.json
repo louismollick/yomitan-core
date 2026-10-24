@@ -1,6 +1,6 @@
 {
   "name": "@yomitan-core/node",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Node.js adapters for yomitan-core: SQLite storage over better-sqlite3 and file-system dictionary sources.",
   "type": "module",
   "license": "GPL-3.0-or-later",
@@ -35,7 +35,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "yomitan-core": "2.2.0"
+    "yomitan-core": "2.3.0"
   },
   "peerDependencies": {
     "better-sqlite3": ">=11.0.0"
