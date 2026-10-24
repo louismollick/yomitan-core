@@ -25,7 +25,9 @@ entries.entries = (await yomitan.lookup.terms('打ち込む')).entries;
 
 `<yomitan-entries>` renders in a shadow root. Set its `controller` property to a
 `createDisplayController(yomitan, { anki })` result to enable Anki buttons. Listen for
-`kanji-click`, `link-click`, and `note-added` to handle app navigation and saves.
+`kanji-click`, `link-click`, and `note-added` to handle app navigation and saves. Set `noteContext`,
+`extraMarkers` and `noteMedia` (for example a `{ screenshot }` image for `{screenshot}`) before the
+user saves; `note-added` reports any media that couldn't be stored in `detail.warnings`.
 
 For a worker, construct the client and its storage inside the worker, then expose a
 message endpoint. The page connects through the other end. A `Worker` or a

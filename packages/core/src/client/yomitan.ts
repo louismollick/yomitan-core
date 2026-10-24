@@ -7,6 +7,7 @@
  */
 
 import { AnkiNotes, type BuildNoteOptions } from '../anki/anki';
+import { type AudioUrl, createAudioUrlResolver } from '../audio/audio-urls';
 import type { StringElement } from '../dom/string-dom';
 import { type ArchiveEntry, type ArchiveReader, createZipArchiveReader } from '../import/archive';
 import type { ImageInfoReader } from '../import/image-info';
@@ -477,6 +478,7 @@ export async function createYomitan(options: CreateYomitanOptions) {
     };
 
     const ankiNotes = new AnkiNotes();
+    const resolveAudioUrls = createAudioUrlResolver(fetchImpl);
     let stringRenderer: Promise<EntryRenderer<StringElement>> | null = null;
 
     const getMediaBytes = async (dictionary: string, path: string) => {
@@ -698,6 +700,19 @@ export async function createYomitan(options: CreateYomitanOptions) {
             /** The root `data-*` attributes (as `dataset` keys) the popup CSS keys off. */
             attributes(theme?: ThemeContext): Record<string, string> {
                 return getDisplayAttributes(profile.options, theme);
+            },
+        },
+
+        audio: {
+            /**
+             * Playable URLs for a term from the profile's audio sources, in source order (then the
+             * default sources, if `audio.enableDefaultAudioSources`). Nothing is downloaded, so a URL
+             * may still turn out to hold no audio. Sources that read a web page or API use the client's
+             * `fetch`, which needs CORS access in browsers; a source that fails contributes no URLs.
+             */
+            urls(term: string, reading: string): Promise<AudioUrl[]> {
+                assertUsable();
+                return resolveAudioUrls(profile.options, term, reading);
             },
         },
 

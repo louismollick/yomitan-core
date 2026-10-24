@@ -12,11 +12,19 @@ import {
     type AnkiNote,
     type AnkiNoteContext,
     type AnkiTransport,
+    type BuiltNote,
     type FieldOverwriteMode,
     type NoteState,
     getNoteStates,
     getOverwrittenField,
 } from '../anki/anki';
+import {
+    type MediaClient,
+    type NoteMedia,
+    type StoredNoteMedia,
+    isStorableRequirement,
+    storeNoteMedia,
+} from '../anki/media';
 import type { ProfileOptions } from '../profile/profile';
 import { isNoteDataValid } from '../upstream/ext/js/data/anki-util.js';
 import type { DictionaryEntry } from '../upstream/types/ext/dictionary';
@@ -40,17 +48,27 @@ export type CardFormatState = {
 export type EntryNoteStates = { entryIndex: number; cardFormats: CardFormatState[] };
 
 /** What the display controller needs from a yomitan-core client. */
-export type DisplayControllerClient = {
+export type DisplayControllerClient = MediaClient & {
     profile: { get(): { options: ProfileOptions } };
     anki: {
         buildNote(
             entry: DictionaryEntry,
-            options?: { cardFormatIndex?: number; context?: AnkiNoteContext; extraMarkers?: Record<string, string> },
-        ): Promise<{ note: AnkiNote; errors: Error[] }>;
+            options?: {
+                cardFormatIndex?: number;
+                context?: AnkiNoteContext;
+                extraMarkers?: Record<string, string>;
+                storedMedia?: StoredNoteMedia;
+            },
+        ): Promise<BuiltNote>;
     };
 };
 
-export type AddNoteResult = { noteId: number; overwritten: boolean };
+export type AddNoteResult = {
+    noteId: number;
+    overwritten: boolean;
+    /** Media that couldn't be stored; the note was added without it. */
+    warnings: string[];
+};
 
 export class DuplicateNoteError extends Error {
     readonly code = 'duplicate';
@@ -181,51 +199,73 @@ export function createDisplayController(client: DisplayControllerClient, { anki 
          * Saves the entry with one card format, as Yomitan's save button does under the profile's
          * `anki.duplicateBehavior`: `new` adds a duplicate, `overwrite` updates the existing note
          * field by field (each field's `overwriteMode`), `prevent` refuses.
+         *
+         * Media markers are filled when the transport can `storeMediaFile`: `{screenshot}` from
+         * `media`, `{audio}` from the profile's audio sources and glossary images from storage. A file
+         * that can't be stored becomes a warning, and its marker renders empty.
          */
         async addNote(
             entry: DictionaryEntry,
             cardFormatIndex: number,
             context: AnkiNoteContext = {},
             extraMarkers?: Record<string, string>,
+            media?: NoteMedia,
         ): Promise<AddNoteResult> {
             const options = client.profile.get().options;
-            const { note, errors } = await client.anki.buildNote(entry, { cardFormatIndex, context, extraMarkers });
-            if (errors.length > 0) {
-                throw new AggregateErrorLike(errors);
+            const buildOptions = { cardFormatIndex, context, extraMarkers };
+            const built = await client.anki.buildNote(entry, buildOptions);
+            if (built.errors.length > 0) {
+                throw new AggregateErrorLike(built.errors);
             }
             const behavior = options.anki.duplicateBehavior;
-            const [state] = await getNoteStates(anki, [note], behavior === 'overwrite');
-            if (state.duplicateNoteIds.length > 0) {
-                if (behavior === 'prevent') {
-                    throw new DuplicateNoteError();
+            const [state] = await getNoteStates(anki, [built.note], behavior === 'overwrite');
+            if (state.duplicateNoteIds.length > 0 && behavior === 'prevent') {
+                throw new DuplicateNoteError();
+            }
+            // Files are stored once the add is certain, then the note is built again with their names.
+            let note = built.note;
+            let warnings: string[] = [];
+            const requirements = built.requirements.filter(isStorableRequirement);
+            if (requirements.length > 0) {
+                const result = await storeNoteMedia(anki, client, entry, requirements, media);
+                warnings = result.warnings;
+                if (result.stored !== null) {
+                    const withMedia = await client.anki.buildNote(entry, {
+                        ...buildOptions,
+                        storedMedia: result.stored,
+                    });
+                    if (withMedia.errors.length > 0) {
+                        throw new AggregateErrorLike(withMedia.errors);
+                    }
+                    note = withMedia.note;
                 }
-                if (behavior === 'overwrite') {
-                    if (anki.notesInfo === undefined) {
-                        throw new Error('This Anki connection cannot read notes to overwrite them');
-                    }
-                    const overwriteId = state.duplicateNoteIds.find((id) => id !== -1);
-                    const info = state.noteInfos.find((item) => item !== null && item.noteId === overwriteId);
-                    if (overwriteId === undefined || info === undefined || info === null) {
-                        throw new Error('The duplicate note could not be found');
-                    }
-                    const fieldOptions = options.anki.cardFormats[cardFormatIndex].fields;
-                    const fields: Record<string, string> = {};
-                    for (const [field, newValue] of Object.entries(note.fields)) {
-                        fields[field] = getOverwrittenField(
-                            info.fields[field]?.value ?? '',
-                            newValue,
-                            fieldOptions[field].overwriteMode as FieldOverwriteMode,
-                        );
-                    }
-                    await anki.updateNoteFields({ ...note, fields, id: overwriteId });
-                    return { noteId: overwriteId, overwritten: true };
+            }
+            if (state.duplicateNoteIds.length > 0 && behavior === 'overwrite') {
+                if (anki.notesInfo === undefined) {
+                    throw new Error('This Anki connection cannot read notes to overwrite them');
                 }
+                const overwriteId = state.duplicateNoteIds.find((id) => id !== -1);
+                const info = state.noteInfos.find((item) => item !== null && item.noteId === overwriteId);
+                if (overwriteId === undefined || info === undefined || info === null) {
+                    throw new Error('The duplicate note could not be found');
+                }
+                const fieldOptions = options.anki.cardFormats[cardFormatIndex].fields;
+                const fields: Record<string, string> = {};
+                for (const [field, newValue] of Object.entries(note.fields)) {
+                    fields[field] = getOverwrittenField(
+                        info.fields[field]?.value ?? '',
+                        newValue,
+                        fieldOptions[field].overwriteMode as FieldOverwriteMode,
+                    );
+                }
+                await anki.updateNoteFields({ ...note, fields, id: overwriteId });
+                return { noteId: overwriteId, overwritten: true, warnings };
             }
             const noteId = await anki.addNote(note);
             if (noteId === null) {
                 throw new Error('Anki did not create the note');
             }
-            return { noteId, overwritten: false };
+            return { noteId, overwritten: false, warnings };
         },
 
         /** Opens existing notes in Anki's browser, when the transport supports it. */

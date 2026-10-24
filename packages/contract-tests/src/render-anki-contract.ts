@@ -7,7 +7,7 @@
 
 import { describe, test } from 'vitest';
 import { type CreateYomitanOptions, type Yomitan, createAnkiConnectTransport, createYomitan } from 'yomitan-core';
-import type { AnkiNote, AnkiNoteInfo, AnkiTransport } from '../../core/src/anki/anki';
+import type { AnkiMediaSource, AnkiNote, AnkiNoteInfo, AnkiTransport } from '../../core/src/anki/anki';
 import { DuplicateNoteError, createDisplayController } from '../../core/src/display/display-controller';
 import type { CreateClientStorage } from './client-contract';
 import { createDictionaryArchive } from './fixtures';
@@ -43,13 +43,14 @@ async function withTermCardFormat(
 }
 
 /** An in-memory Anki with the AnkiConnect duplicate semantics the display controller relies on. */
-export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolean } = {}) {
+export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolean; media?: boolean } = {}) {
     const notes = new Map<number, AnkiNote>();
     let nextId = 1;
     const firstFieldKey = (note: AnkiNote) => `${note.modelName}\u0000${Object.values(note.fields)[0] ?? ''}`;
     const isDuplicate = (note: AnkiNote) =>
         [...notes.values()].some((existing) => firstFieldKey(existing) === firstFieldKey(note));
     const browsed: number[][] = [];
+    const stored: { fileName: string; source: AnkiMediaSource }[] = [];
     const transport: AnkiTransport = {
         async addNote(note) {
             const id = nextId++;
@@ -99,7 +100,13 @@ export function createFakeAnki(options: { errorDetail?: boolean; browse?: boolea
             browsed.push(ids);
         };
     }
-    return { transport, notes, browsed };
+    if (options.media === true) {
+        transport.storeMediaFile = async (fileName, source) => {
+            stored.push({ fileName, source });
+            return fileName;
+        };
+    }
+    return { transport, notes, browsed, stored };
 }
 
 export function runRenderAnkiContract(
@@ -367,6 +374,81 @@ export function runRenderAnkiContract(
             await client.dispose();
         });
 
+        test('stores the screenshot, audio and glossary images that media markers ask for', async ({ expect }) => {
+            const client = await importedClient(createStorage, makeClient);
+            await withTermCardFormat(client, {
+                Word: '{expression}',
+                Shot: '{screenshot}',
+                Audio: '{audio}',
+                Meaning: '{glossary}',
+            });
+            const profile = client.profile.get();
+            profile.options.audio.sources = [{ type: 'jpod101', url: '', voice: '' }];
+            profile.options.audio.enableDefaultAudioSources = false;
+            await client.profile.set(profile);
+            const { transport, notes, stored } = createFakeAnki({ media: true });
+            const controller = createDisplayController(client, { anki: transport });
+            const { entries } = await client.lookup.terms('画像');
+
+            const result = await controller.addNote(entries[0], 0, {}, undefined, {
+                screenshot: { data: new Uint8Array([1, 2, 3]), mediaType: 'image/webp' },
+            });
+
+            expect(result.warnings).toEqual([]);
+            const screenshot = stored.find(({ fileName }) => fileName.startsWith('yomitan_browser_screenshot_'));
+            expect(screenshot?.fileName).toMatch(/\.webp$/);
+            expect(screenshot?.source).toEqual({ data: 'AQID' });
+            const audio = stored.find(({ fileName }) => fileName.startsWith('yomitan_audio_'));
+            expect(audio?.fileName).toMatch(/\.mp3$/);
+            expect(audio?.source).toEqual({
+                url: expect.stringMatching(
+                    /^https:\/\/assets\.languagepod101\.com\/dictionary\/japanese\/audiomp3\.php\?/,
+                ),
+                skipHash: '7e2c2f954ef6051373ba916f000168dc',
+            });
+            const image = stored.find(({ fileName }) => fileName.startsWith('yomitan_dictionary_media_'));
+            expect(image?.fileName).toMatch(/\.gif$/);
+            expect(image?.source).toMatchObject({ data: expect.stringMatching(/^R0lGOD/) });
+
+            const fields = notes.get(result.noteId)?.fields ?? {};
+            expect(fields.Shot).toContain(`<img src="${screenshot?.fileName}"`);
+            expect(fields.Audio).toBe(`[sound:${audio?.fileName}]`);
+            expect(fields.Meaning).toContain(`src="${image?.fileName}"`);
+            await client.dispose();
+        });
+
+        test('media markers render empty when the transport cannot store files, or there is nothing to store', async ({
+            expect,
+        }) => {
+            const client = await importedClient(createStorage, makeClient);
+            await withTermCardFormat(client, { Word: '{expression}', Shot: '{screenshot}', Audio: '{audio}' });
+            const screenshot = { data: new Uint8Array([1]), mediaType: 'image/jpeg' };
+            const { entries } = await client.lookup.terms('画像');
+
+            const noStore = createFakeAnki();
+            const first = await createDisplayController(client, { anki: noStore.transport }).addNote(
+                entries[0],
+                0,
+                {},
+                undefined,
+                { screenshot },
+            );
+            expect(noStore.notes.get(first.noteId)?.fields).toMatchObject({ Shot: '', Audio: '' });
+            expect(first.warnings).toEqual([]);
+
+            // No screenshot supplied, and a bad media type reported without blocking the add.
+            const store = createFakeAnki({ media: true });
+            const controller = createDisplayController(client, { anki: store.transport });
+            const second = await controller.addNote(entries[0], 0);
+            expect(store.notes.get(second.noteId)?.fields).toMatchObject({ Shot: '' });
+            const third = await controller.addNote(entries[0], 0, {}, undefined, {
+                screenshot: { data: new Uint8Array([1]), mediaType: 'text/plain' },
+            });
+            expect(third.warnings).toEqual(['Unknown media type for screenshot image']);
+            expect(store.notes.get(third.noteId)?.fields).toMatchObject({ Shot: '' });
+            await client.dispose();
+        });
+
         test('the display controller adds, reports duplicates, and follows duplicate behaviour', async ({ expect }) => {
             const client = await importedClient(createStorage, makeClient);
             await withTermCardFormat(client, { Word: '{expression}', Meaning: '{glossary-brief}' });
@@ -409,7 +491,7 @@ export function runRenderAnkiContract(
                 existing.fields.Meaning = '';
             }
             const overwritten = await controller.addNote(entry, 0);
-            expect(overwritten).toEqual({ noteId: first.noteId, overwritten: true });
+            expect(overwritten).toEqual({ noteId: first.noteId, overwritten: true, warnings: [] });
             expect(notes.get(first.noteId)?.fields.Meaning).not.toBe('');
             await client.dispose();
         });
