@@ -17,6 +17,7 @@ import {
     getFindKanjiOptions,
     getFindTermsOptions,
 } from '../lookup/find-options';
+import { type SegmentToken, segmentText } from '../lookup/segment';
 import { type ParseToken, type ScanResult, parseText, scanText, sentenceAt } from '../lookup/text-lookup';
 import type { Sentence } from '../lookup/text-source';
 import { type AbortSignalLike, type BlobLike, isBlobLike } from '../platform/types';
@@ -398,6 +399,31 @@ export async function createYomitan(options: CreateYomitanOptions) {
         return await translator.findTerms('simple', text, getFindTermsOptions('simple', details, profile.options));
     };
 
+    /** Segmenting needs the matches of every length, so it asks for `group` mode without truncation. */
+    const findTermsForSegment = async (text: string, details: FindTermsDetails = {}) => {
+        return await translator.findTerms('group', text, getFindTermsOptions('group', details, profile.options));
+    };
+
+    /**
+     * The dictionary whose frequencies rank words for `segment`: the profile's sort frequency
+     * dictionary, else the first enabled dictionary with term frequencies. Occurrence-based dictionaries
+     * are skipped because they have no ranks.
+     */
+    const getSegmentFrequencyDictionary = async (): Promise<string | null> => {
+        const { sortFrequencyDictionary } = profile.options.general;
+        if (sortFrequencyDictionary !== null) {
+            return sortFrequencyDictionary;
+        }
+        const installed = await listInstalled();
+        for (const { name, enabled } of profile.options.dictionaries) {
+            const summary = installed.find(({ title }) => title === name);
+            if (enabled && summary?.frequencyMode !== 'occurrence-based' && (summary?.counts?.termMeta.freq ?? 0) > 0) {
+                return name;
+            }
+        }
+        return null;
+    };
+
     const ankiNotes = new AnkiNotes();
     let stringRenderer: Promise<EntryRenderer<StringElement>> | null = null;
 
@@ -554,6 +580,15 @@ export async function createYomitan(options: CreateYomitanOptions) {
             parse(text: string): Promise<ParseToken[]> {
                 assertUsable();
                 return parseText(text, profile.options, findTermsForParse);
+            },
+            /**
+             * Splits text into words by the cheapest path through all dictionary matches, scored by
+             * frequency rank (see `getSegmentFrequencyDictionary`), or by fewest words without one.
+             * Each token carries the term entries for its span, as `terms(token.text)` would show them.
+             */
+            async segment(text: string): Promise<SegmentToken[]> {
+                assertUsable();
+                return segmentText(text, profile.options, findTermsForSegment, await getSegmentFrequencyDictionary());
             },
             /** The sentence around `[offset, offset + length)` under the profile's sentence rules. */
             sentence(text: string, offset: number, length = 0): Sentence {

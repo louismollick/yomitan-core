@@ -49,6 +49,7 @@ const METHODS = new Set([
     'lookup.kanji',
     'lookup.scan',
     'lookup.parse',
+    'lookup.segment',
     'lookup.sentence',
     'render.html',
     'render.document',
@@ -306,6 +307,7 @@ export async function connectYomitan(endpoint: MessageEndpoint): Promise<Yomitan
             kanji: remote('lookup.kanji'),
             scan: remote('lookup.scan'),
             parse: remote('lookup.parse'),
+            segment: remote('lookup.segment'),
             sentence: (text: string, offset: number, length = 0) => sentenceAt(text, offset, length, profile.options),
         },
         render: {

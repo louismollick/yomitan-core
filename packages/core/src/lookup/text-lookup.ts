@@ -93,6 +93,53 @@ export type ParseToken = {
 };
 
 /**
+ * How a matched span reads: furigana segments from the best entry, and the headwords (one list per
+ * entry) whose primary exact source is exactly the span. Port of the matched branch of upstream's
+ * `_textParseScanning`. `segments` is empty when the best headword cannot be distributed over `source`.
+ */
+export function describeMatch(
+    dictionaryEntries: readonly TermDictionaryEntry[],
+    source: string,
+): { segments: ParseSegment[]; headwords: ParseHeadword[][] } {
+    const segments: ParseSegment[] = [];
+    const headwords: ParseHeadword[][] = [];
+    const {
+        headwords: [{ term, reading }],
+    } = dictionaryEntries[0];
+    for (const segment of distributeFuriganaInflected(term, reading, source) as ParseSegment[]) {
+        segments.push({ text: segment.text, reading: segment.reading });
+    }
+    if (segments.length > 0) {
+        const token = segments.map((segment) => segment.text).join('');
+        for (const dictionaryEntry of dictionaryEntries) {
+            const valid: ParseHeadword[] = [];
+            for (const headword of dictionaryEntry.headwords) {
+                const sources = headword.sources.filter(
+                    (src) => src.originalText === token && src.isPrimary && src.matchType === 'exact',
+                );
+                if (sources.length > 0) {
+                    valid.push({
+                        term: headword.term,
+                        reading: headword.reading,
+                        sources,
+                        frequencies: dictionaryEntry.frequencies.filter(
+                            (f) => f.headwordIndex === headword.headwordIndex,
+                        ),
+                        pronunciations: dictionaryEntry.pronunciations.filter(
+                            (p) => p.headwordIndex === headword.headwordIndex,
+                        ),
+                    });
+                }
+            }
+            if (valid.length > 0) {
+                headwords.push(valid);
+            }
+        }
+    }
+    return { segments, headwords };
+}
+
+/**
  * Port of upstream's scanning parser (`Backend._textParseScanning`): repeatedly looks up the longest
  * term at the current position; unmatched characters are merged into plain segments.
  */
@@ -109,57 +156,22 @@ export async function parseText(text: string, options: ProfileOptions, findTerms
             matchType: 'exact',
             deinflect: true,
         });
-        const segments: ParseSegment[] = [];
-        let headwords: ParseHeadword[][] | undefined;
+        let match: ReturnType<typeof describeMatch> | undefined;
         if (
             dictionaryEntries.length > 0 &&
             originalTextLength > 0 &&
             (originalTextLength !== character.length || isCodePointJapanese(codePoint))
         ) {
-            const {
-                headwords: [{ term, reading }],
-            } = dictionaryEntries[0];
-            const source = substring.substring(0, originalTextLength);
-            for (const segment of distributeFuriganaInflected(term, reading, source) as ParseSegment[]) {
-                segments.push({ text: segment.text, reading: segment.reading });
-            }
-            if (segments.length > 0) {
-                const token = segments.map((segment) => segment.text).join('');
-                headwords = [];
-                for (const dictionaryEntry of dictionaryEntries) {
-                    const valid: ParseHeadword[] = [];
-                    for (const headword of dictionaryEntry.headwords) {
-                        const sources = headword.sources.filter(
-                            (src) => src.originalText === token && src.isPrimary && src.matchType === 'exact',
-                        );
-                        if (sources.length > 0) {
-                            valid.push({
-                                term: headword.term,
-                                reading: headword.reading,
-                                sources,
-                                frequencies: dictionaryEntry.frequencies.filter(
-                                    (f) => f.headwordIndex === headword.headwordIndex,
-                                ),
-                                pronunciations: dictionaryEntry.pronunciations.filter(
-                                    (p) => p.headwordIndex === headword.headwordIndex,
-                                ),
-                            });
-                        }
-                    }
-                    if (valid.length > 0) {
-                        headwords.push(valid);
-                    }
-                }
-            }
+            match = describeMatch(dictionaryEntries, substring.substring(0, originalTextLength));
         }
-        if (segments.length > 0) {
+        if (match !== undefined && match.segments.length > 0) {
             previousUngrouped = null;
-            const tokenText = segments.map((segment) => segment.text).join('');
+            const { segments, headwords } = match;
             tokens.push({
-                text: tokenText,
+                text: segments.map((segment) => segment.text).join(''),
                 range: { start: i, end: i + originalTextLength },
                 segments,
-                ...(headwords === undefined ? {} : { headwords }),
+                headwords,
             });
             i += originalTextLength;
         } else {

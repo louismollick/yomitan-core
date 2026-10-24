@@ -12,6 +12,7 @@ import {
     type Yomitan,
     YomitanAbortError,
     createYomitan,
+    tokenAt,
 } from 'yomitan-core';
 import { createFilesArchiveReader } from '../../core/src/import/archive';
 import type { YomitanStorage } from '../../core/src/storage/types';
@@ -21,6 +22,52 @@ import { readFixtureDictionaryFiles } from './import-contract';
 export type CreateClientStorage = () => Promise<YomitanStorage> | YomitanStorage;
 
 const TITLE = 'Test Dictionary';
+
+/**
+ * A tiny dictionary where the longest match is the wrong split: そのバー (その場 matches through the
+ * kana variants) and からん (下欄). With `frequencyMode`, term_meta ranks the short words well.
+ */
+async function createSegmentationArchive(frequencyMode?: 'rank-based' | 'occurrence-based'): Promise<ArrayBuffer> {
+    const terms = [
+        ['その', 'その'],
+        ['バー', 'ばー'],
+        ['その場', 'そのば'],
+        ['から', 'から'],
+        ['ん', 'ん'],
+        ['下欄', 'からん'],
+        ['あ', 'あ'],
+        ['あい', 'あい'],
+        ['あいう', 'あいう'],
+        ['いうえ', 'いうえ'],
+    ];
+    const ranks: Record<string, number> = { その: 10, バー: 800, その場: 3000, から: 10, ん: 10, 下欄: 150000 };
+    const files: Record<string, string> = {
+        'index.json': JSON.stringify({
+            title: 'Segment Test',
+            format: 3,
+            revision: '1',
+            sequenced: false,
+            ...(frequencyMode === undefined ? {} : { frequencyMode }),
+        }),
+        'term_bank_1.json': JSON.stringify(terms.map(([term, reading]) => [term, reading, '', '', 0, ['def'], -1, ''])),
+    };
+    if (frequencyMode !== undefined) {
+        files['term_meta_bank_1.json'] = JSON.stringify(
+            Object.entries(ranks).map(([term, rank]) => [term, 'freq', rank]),
+        );
+    }
+    return await zipFiles(files);
+}
+
+async function withSegmentation(
+    createStorage: CreateClientStorage,
+    makeClient: (options: CreateYomitanOptions) => Promise<Yomitan>,
+    frequencyMode?: 'rank-based' | 'occurrence-based',
+): Promise<Yomitan> {
+    const client = await makeClient({ storage: await createStorage() });
+    await client.dictionaries.import({ source: await createSegmentationArchive(frequencyMode) });
+    return client;
+}
 
 type Fetch = NonNullable<CreateYomitanOptions['fetch']>;
 
@@ -108,6 +155,63 @@ export function runClientContract(
             expect(tokens[0].segments[0]).toEqual({ text: '打', reading: 'う' });
             expect(tokens.map(({ text: token }) => token).join('')).toBe(text);
             await client.dispose();
+        });
+
+        test('segments by the cheapest frequency-scored path where parse takes the longest match', async ({
+            expect,
+        }) => {
+            const client = await withSegmentation(createStorage, makeClient, 'rank-based');
+            const spans = async (text: string) =>
+                (await client.lookup.segment(text)).map(({ text: token, entries }) => [token, entries.length > 0]);
+            // parse swallows the next word (そのバ matches その場) and leaves ー over; the lattice splits その | バー.
+            expect((await client.lookup.parse('そのバー')).map(({ text }) => text)).toEqual(['そのバ', 'ー']);
+            expect(await spans('そのバー')).toEqual([
+                ['その', true],
+                ['バー', true],
+            ]);
+            expect(await spans('からん')).toEqual([
+                ['から', true],
+                ['ん', true],
+            ]);
+            // Unmatched characters merge into one entry-less token, ranges cover the whole text.
+            const tokens = await client.lookup.segment('そのxyバー');
+            expect(tokens.map(({ text }) => text)).toEqual(['その', 'xy', 'バー']);
+            expect(tokens[1]).toMatchObject({ range: { start: 2, end: 4 }, entries: [] });
+            await client.dispose();
+        });
+
+        test('segment tokens carry the entries and furigana for exactly their span', async ({ expect }) => {
+            const client = await withSegmentation(createStorage, makeClient, 'rank-based');
+            const tokens = await client.lookup.segment('そのバー');
+            const [first, second] = tokens;
+            expect(first.entries.map(({ headwords }) => headwords[0].term)).toEqual(['その']);
+            expect(second.range).toEqual({ start: 2, end: 4 });
+            expect(second.entries.map(({ headwords }) => headwords[0].term)).toEqual(['バー']);
+            expect(second.segments).toEqual([{ text: 'バー', reading: '' }]);
+            expect(second.headwords?.[0][0]).toMatchObject({ term: 'バー', reading: 'ばー' });
+            // The same entries a lookup of just the span shows.
+            const looked = await client.lookup.terms('バー', { mode: 'group' });
+            expect(second.entries.map(({ headwords }) => headwords[0].term)).toEqual(
+                looked.entries
+                    .filter(({ headwords }) =>
+                        headwords.some(({ sources }) => sources.some(({ originalText }) => originalText === 'バー')),
+                    )
+                    .map(({ headwords }) => headwords[0].term),
+            );
+            expect(tokenAt(tokens, 3)).toBe(second);
+            expect(tokenAt(tokens, 4)).toBeUndefined();
+            await client.dispose();
+        });
+
+        test('segment falls back to the fewest words without a rank-based frequency dictionary', async ({ expect }) => {
+            for (const frequencyMode of [undefined, 'occurrence-based'] as const) {
+                const client = await withSegmentation(createStorage, makeClient, frequencyMode);
+                const split = async (text: string) => (await client.lookup.segment(text)).map(({ text: t }) => t);
+                // Fewest words: the single word 下欄 beats から | ん, and あ | いうえ beats あいう | え.
+                expect(await split('からん')).toEqual(['からん']);
+                expect(await split('あいうえ')).toEqual(['あ', 'いうえ']);
+                await client.dispose();
+            }
         });
 
         test('deletes a dictionary and drops it from the profile', async ({ expect }) => {

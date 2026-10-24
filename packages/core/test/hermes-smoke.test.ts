@@ -132,6 +132,7 @@ describe('Hermes smoke test', () => {
                 range: { start: 3, end: 7 },
                 sentence: { text: '今日は打ち込む。', offset: 3 },
                 parse: ['打ち込む', '\n', '打つ'],
+                segment: ['打ち込む', '\n', '打つ'],
                 recommended: true,
                 html: true,
                 note: { word: '打ち込む', glossary: true, errors: 0 },

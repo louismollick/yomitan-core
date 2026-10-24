@@ -72,7 +72,11 @@ _Avoid_: termAt, hit-test
 
 **Parse**:
 Splitting a whole text into consecutive terms, as Yomitan's "parse text" feature does.
-_Avoid_: tokenize, scanLine, segment
+_Avoid_: tokenize, scanLine
+
+**Segment**:
+Splitting a whole text into words by the cheapest path through every dictionary match, scored by frequency, so a long match cannot swallow the next word. Unlike parse it has no Yomitan counterpart. Each token carries the term entries for its span.
+_Avoid_: tokenize
 
 **Sentence**:
 The span of text around a scanned position, bounded by Yomitan's sentence-parsing rules. It feeds Anki fields such as `{sentence}` and `{cloze-*}`.

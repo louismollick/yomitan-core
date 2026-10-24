@@ -121,6 +121,7 @@ yomitan.lookup.terms(text, { mode?, primaryReading? })   // Yomitan's findTerms 
 yomitan.lookup.kanji(text)
 yomitan.lookup.scan(text, offset)       // Yomitan's TextScanner semantics: entries, matched range, sentence
 yomitan.lookup.parse(text)              // Yomitan's scanning parser: segments with UTF-16 ranges and furigana
+yomitan.lookup.segment(text)            // not in Yomitan: lattice segmentation into words with entries (see CONTEXT.md, Segment)
 yomitan.lookup.sentence(text, offset)
 
 yomitan.render.views(entries)           // EntryView[]
