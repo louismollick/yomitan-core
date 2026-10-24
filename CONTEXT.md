@@ -81,11 +81,17 @@ _Avoid_: tokenize
 **Sentence**:
 The span of text around a scanned position, bounded by Yomitan's sentence-parsing rules. It feeds Anki fields such as `{sentence}` and `{cloze-*}`.
 
+**Kanji-term index**:
+For each frequency dictionary and kanji, the most frequent terms that contain that kanji. It is built when the dictionary is imported (or on first use for older imports), and it backs `lookup.termsContaining`. It is derived data, not part of Yomitan's schema.
+
 ### Presentation
 
 **Entry view**:
 A description of how an entry is presented (layout, headwords with furigana, tags, frequencies, pitch accents, glossary content) that doesn't depend on any target.
 _Avoid_: view model, render tree, HTML
+
+**Glossary block**:
+One dictionary's definitions for a term entry, as Yomitan renders them (definition tags, structured content, images). A consumer that draws the rest of an entry itself can still use these for exact glossary formatting.
 
 **Renderer**:
 Something that turns entry views into UI for one target: DOM, HTML string or React Native.

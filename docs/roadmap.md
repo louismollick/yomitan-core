@@ -112,6 +112,8 @@ Hosting the engine off the JS thread: a worklets runtime, a JSI thread, or a hea
 
 Consumers provide their own layout over entry views, while the default stays Yomitan's markup.
 
+**Partial path available.** `render.glossaries(entry)` returns one HTML block per dictionary (Yomitan's definition list: structured content, images, definition tags), so a host can draw headwords, furigana, pitch, frequencies and actions itself and keep Yomitan's glossary formatting. Style it with `render.css()` (scoped under the element that carries `render.attributes()`). Entry views would replace the rest.
+
 **Scope.**
 - Documented part-level overrides: headword, definitions, tags, frequencies, pitch.
 - Alternatively, a full custom renderer built on the same entry view and display controller.
